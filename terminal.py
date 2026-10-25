@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
+import exportar
 import fontes
 import leitura
 
@@ -304,14 +305,52 @@ def rota_morningcall(args):
 
 
 def rota_exportar(args):
-    """Niveis em formato de texto para colar em plataforma (item 9)."""
+    """Linha de dados pronta para colar no indicador da plataforma."""
+    cfg = ler_config()
     destino = (args.get("destino") or ["texto"])[0]
-    simbolo = (args.get("simbolo") or [GRAFICO_PADRAO])[0]
-    niveis = niveis_para_grafico(simbolo)
-    ticker = ler_config()["tickers"].get(destino, "")
-    return {"destino": destino, "simbolo": simbolo, "ticker": ticker,
-            "niveis": niveis, "pronto": False,
-            "aviso": "Exportacao ainda nao implementada - so o layout."}
+    simbolo = (args.get("simbolo") or [cfg["grafico"]])[0]
+    ticker = cfg["tickers"].get(destino, "")
+    dias = int((args.get("dias") or [cfg["dias_max"]])[0])
+
+    indice = "NDX" if simbolo in ("NQ=F", "^NDX") else "SPX"
+
+    try:
+        dados = G.baixar(indice)
+    except Exception as e:
+        return {"destino": destino, "erro": "nao foi possivel baixar a CBOE: "
+                + str(e)}
+
+    calc = exportar.calcular(G, dados, dias_padrao=dias)
+    if not calc:
+        return {"destino": destino,
+                "erro": "sem contratos usaveis para " + indice}
+
+    basis = 0.0
+    if simbolo.endswith("=F"):
+        c = fontes.cotacao(simbolo)
+        if c and calc["spot"]:
+            basis = c["preco"] - calc["spot"]
+
+    linha, valores = exportar.montar(ticker, calc, basis=basis)
+
+    with TRAVA:
+        CACHE["exportado"] = {"linha": linha, "quando":
+                              datetime.now(timezone.utc).isoformat(timespec="seconds")}
+
+    aviso = ""
+    if not calc["tem_0dte"]:
+        aviso = ("Nenhum contrato vence hoje, entao os campos 0DTE ficaram de "
+                 "fora da linha. Normal em fim de semana e depois do "
+                 "fechamento.")
+
+    return {
+        "destino": destino, "simbolo": simbolo, "indice": indice,
+        "ticker": ticker, "linha": linha, "valores": valores,
+        "spot": calc["spot"], "basis": basis, "iv": calc["iv"],
+        "contratos": calc["contratos"], "contratos_0dte": calc["contratos_0dte"],
+        "dias": dias, "niveis": niveis_para_grafico(simbolo),
+        "pronto": True, "aviso": aviso,
+    }
 
 
 ROTAS = {

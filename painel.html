@@ -259,6 +259,7 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
           <label><input type="radio" name="tkbase" value="US100"> US100</label>
           <label><input type="radio" name="tkbase" value="NQ"> NQ</label>
           <label><input type="radio" name="tkbase" value="MNQ"> MNQ</label>
+          <label><input type="radio" name="tkbase" value="NQ1!"> NQ1!</label>
         </span>
       </h2>
       <div class="expLinha">
@@ -375,9 +376,13 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
       <h2 style="margin:0" id="tituloExport">Niveis</h2>
       <button class="fantasma" data-fecha="modalExport">fechar</button>
     </div>
-    <p class="aviso" id="avisoExport" style="color:var(--apagado)"></p>
-    <pre class="saida" id="saidaExport"></pre>
-    <button id="btCopiar">copiar</button>
+    <p class="aviso" id="avisoExport" style="color:var(--apagado);font-size:11.5px"></p>
+    <pre class="saida" id="saidaExport" style="white-space:pre-wrap"></pre>
+    <button id="btCopiar">copiar a linha</button>
+    <p style="color:var(--apagado);font-size:11.5px;margin:12px 0 4px">
+      Cole no campo <b>Cole os Dados Aqui</b> das configuracoes do indicador.
+      Abaixo, os mesmos valores separados, para conferir antes de colar.</p>
+    <div id="tabelaExport"></div>
   </div>
 </div>
 
@@ -826,25 +831,58 @@ function montaEditorCores() {
 /* ---------------------------------------------------- 9: exportar */
 async function textoNiveis(destino) {
   const simbolo = $("#selAtivo").value;
+  const dias = $("#selDias").value;
   const d = await pega("/api/exportar?destino=" + destino
-    + "&simbolo=" + encodeURIComponent(simbolo));
-  const linhas = (d.niveis || []).map(n =>
-    n.rotulo.padEnd(22) + num(n.preco, 2) + (n.exato ? "" : "   (aproximado)"));
-  const cabeca = (d.ticker ? d.ticker : simbolo) + "  -  "
-    + new Date().toLocaleString("pt-BR")
-    + (d.ticker ? "   (niveis de " + simbolo + ")" : "");
-  const corpo = linhas.length
-    ? (cabeca + "\n\n" + linhas.join("\n"))
-    : "sem niveis calculados ainda - clique em ATUALIZAR REGIOES primeiro";
-  return { corpo: corpo, aviso: d.aviso || "", vazio: !linhas.length };
+    + "&simbolo=" + encodeURIComponent(simbolo) + "&dias=" + dias);
+  if (d.erro) return { corpo: "", erro: d.erro, vazio: true };
+  return {
+    corpo: d.linha || "", aviso: d.aviso || "", vazio: !d.linha,
+    valores: d.valores || {}, info: d
+  };
 }
 
+const NOMES_PLATAFORMA = {
+  mt5: "MetaTrader 5", tradingview: "TradingView", ninjatrader: "NinjaTrader"
+};
+
 async function exportar(destino) {
-  const d = await textoNiveis(destino);
-  $("#tituloExport").textContent = "Niveis para " + destino.toUpperCase();
-  $("#avisoExport").textContent = d.aviso;
-  $("#saidaExport").textContent = d.corpo;
+  $("#tituloExport").textContent = "Dados para " + (NOMES_PLATAFORMA[destino] || destino);
+  $("#avisoExport").textContent = "gerando...";
+  $("#saidaExport").textContent = "";
+  $("#tabelaExport").innerHTML = "";
   $("#modalExport").classList.add("on");
+
+  const d = await textoNiveis(destino);
+  if (d.erro) {
+    $("#avisoExport").textContent = d.erro;
+    return;
+  }
+
+  const i = d.info;
+  const partes = ["ticker " + (i.ticker || "(vazio)"),
+                  "niveis de " + i.indice,
+                  i.contratos + " contratos",
+                  "vencimento " + i.dias + "d"];
+  if (i.basis) partes.push("basis " + num(i.basis, 2));
+  if (i.contratos_0dte) partes.push(i.contratos_0dte + " contratos 0DTE");
+  $("#avisoExport").textContent = partes.join("  -  ")
+    + (d.aviso ? "   |   " + d.aviso : "");
+  $("#saidaExport").textContent = d.corpo
+    || "sem niveis - clique em ATUALIZAR REGIOES primeiro";
+
+  // tabela de conferencia, para bater os numeros antes de colar
+  const chaves = Object.keys(d.valores);
+  if (chaves.length) {
+    const t = el("table", "cal");
+    t.innerHTML = "<tr><th>campo</th><th>valor</th></tr>";
+    chaves.forEach(k => {
+      const tr = el("tr");
+      tr.innerHTML = "<td>" + k + "</td><td><b>"
+        + num(d.valores[k], 2) + "</b></td>";
+      t.appendChild(tr);
+    });
+    $("#tabelaExport").appendChild(t);
+  }
 }
 
 async function copiarNiveis(destino, botao) {
