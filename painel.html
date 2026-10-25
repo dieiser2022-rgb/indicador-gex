@@ -327,9 +327,14 @@ button:disabled { background: #334155; cursor: wait; filter: none;
       border-bottom: 1px solid rgba(148,163,184,.10); font-size: 12.5px;
       transition: background .15s; }
 .ev:hover { background: rgba(148,163,184,.05); }
-.ev .hora { color: var(--apagado); width: 44px; flex: none;
+.ev .hora { color: var(--apagado); width: 40px; flex: none;
             font-variant-numeric: tabular-nums; font-family: var(--mono);
             font-size: 11.5px; }
+/* as bolinhas da agenda ficam em coluna propria, antes da hora */
+.ev .rel { padding-top: 4px; }
+/* evento de alto impacto chama atencao sem precisar ler a hora */
+.ev.imp3 .tit { font-weight: 600; }
+table.cal .rel { vertical-align: middle; }
 .ev .tit { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
            white-space: nowrap; }
 .ev .vals { color: var(--apagado); font-size: 11px; flex: none; }
@@ -378,15 +383,16 @@ button:disabled { background: #334155; cursor: wait; filter: none;
 .nt .meta { color: var(--apagado); font-size: 10px; margin-bottom: 3px;
             font-family: var(--mono); letter-spacing: .2px;
             display: flex; align-items: center; gap: 6px; }
-/* tres bolinhas: quantas estao acesas indica o alcance do assunto */
-.nt .rel { display: inline-flex; gap: 2.5px; flex: none; }
-.nt .rel i { width: 5px; height: 5px; border-radius: 50%;
-             background: var(--borda); display: block; }
-.nt.peso3 .rel i.on { background: var(--baixa);
-                      box-shadow: 0 0 6px var(--baixa); }
-.nt.peso2 .rel i.on { background: var(--inversao);
-                      box-shadow: 0 0 5px var(--inversao); }
-.nt.peso1 .rel i.on { background: var(--apagado); }
+/* Tres bolinhas: quantas estao acesas indica o alcance do assunto. Usado
+   nas noticias e na agenda, com a mesma leitura visual nos dois. */
+.rel { display: inline-flex; gap: 2.5px; flex: none; }
+.rel i { width: 5px; height: 5px; border-radius: 50%;
+         background: var(--borda); display: block; }
+.peso3 .rel i.on, .imp3 .rel i.on { background: var(--baixa);
+                                    box-shadow: 0 0 6px var(--baixa); }
+.peso2 .rel i.on, .imp2 .rel i.on { background: var(--inversao);
+                                    box-shadow: 0 0 5px var(--inversao); }
+.peso1 .rel i.on, .imp1 .rel i.on { background: var(--apagado); }
 /* a borda esquerda repete a cor, para achar o que importa de relance */
 .nt.peso3 { border-left-color: rgba(239,68,68,.55); }
 .nt.peso2 { border-left-color: rgba(251,191,36,.4); }
@@ -745,8 +751,24 @@ async function pega(url) {
 }
 
 /* ---------------------------------------------------- 1: agenda */
+const DICA_PESO = {
+  3: "alto impacto - costuma mexer com o indice",
+  2: "impacto medio",
+  1: "baixo impacto",
+  0: "sem impacto definido"
+};
+
+function bolinhas(peso) {
+  const g = el("span", "rel");
+  for (let i = 1; i <= 3; i++) g.appendChild(el("i", i <= peso ? "on" : ""));
+  g.title = DICA_PESO[peso] || DICA_PESO[0];
+  return g;
+}
+
 function linhaEvento(e, passou) {
-  const d = el("div", "ev imp" + (e.peso || 0) + (passou ? " passou" : ""));
+  const peso = e.peso || 0;
+  const d = el("div", "ev imp" + peso + (passou ? " passou" : ""));
+  d.appendChild(bolinhas(peso));
   const h = el("span", "hora"); h.textContent = hora(e.ts);
   const t = el("span", "tit");
   t.textContent = (e.moeda ? e.moeda + " " : "") + e.titulo;
@@ -775,14 +797,16 @@ function mostraAgenda(d) {
   const full = $("#calCompleto"); full.innerHTML = "";
   if (!d.todos.length) { full.innerHTML = '<span class="vazio">nada</span>'; return; }
   const tb = el("table", "cal");
-  tb.innerHTML = "<tr><th>dia</th><th>hora</th><th>moeda</th><th>evento</th>"
-               + "<th>previsao</th><th>anterior</th></tr>";
+  tb.innerHTML = "<tr><th></th><th>dia</th><th>hora</th><th>moeda</th>"
+               + "<th>evento</th><th>previsao</th><th>anterior</th></tr>";
   d.todos.forEach(e => {
-    const tr = el("tr", "imp" + (e.peso || 0));
+    const peso = e.peso || 0;
+    const tr = el("tr", "imp" + peso);
     if (e.ts <= d.agora) tr.style.opacity = ".45";
-    tr.innerHTML = "<td>" + dia(e.ts) + "</td><td>" + hora(e.ts) + "</td><td>"
-      + (e.moeda || "") + "</td><td>" + e.titulo + "</td><td>"
+    tr.innerHTML = "<td></td><td>" + dia(e.ts) + "</td><td>" + hora(e.ts)
+      + "</td><td>" + (e.moeda || "") + "</td><td>" + e.titulo + "</td><td>"
       + (e.previsao || "") + "</td><td>" + (e.anterior || "") + "</td>";
+    tr.firstChild.appendChild(bolinhas(peso));
     tb.appendChild(tr);
   });
   full.appendChild(tb);
@@ -1070,11 +1094,7 @@ function mostraNoticias(d) {
     const c = el("div", "nt peso" + peso);
     const m = el("div", "meta");
     // bolinhas de relevancia: tres para o que mexe com o indice inteiro
-    const bolas = el("span", "rel");
-    for (let i = 1; i <= 3; i++) {
-      const b = el("i", i <= peso ? "on" : "");
-      bolas.appendChild(b);
-    }
+    const bolas = bolinhas(peso);
     bolas.title = peso === 3 ? "mexe com o mercado todo"
                 : peso === 2 ? "mexe com um setor ou empresa grande"
                 : "assunto geral";
