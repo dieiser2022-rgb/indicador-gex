@@ -87,11 +87,21 @@ marcar(preco, texto, cor, estilo) =>
         etiqueta = label.new(bar_index + 3, preco, escrito, style = label.style_label_left, color = color.new(cor, transparencia), textcolor = cor, size = tamanho_texto())
         array.push(rotulos, etiqueta)
 
+// Aviso na tela quando o campo de dados esta vazio. Sem isso o indicador fica
+// invisivel e nao da para saber se ele carregou, se compilou ou se falta
+// colar o texto.
+var tabela = table.new(position.top_right, 1, 1, border_width = 1)
+
 // ------------------------------------------------------------------ desenho
 if barstate.islast
     apagar_tudo()
     array.clear(nomes)
     array.clear(valores)
+
+    if str.length(dados) <= 2
+        table.cell(tabela, 0, 0, "GEX: cole os dados nas configuracoes do indicador", text_color = cor_hvl, text_size = size.normal, bgcolor = color.new(color.black, 20))
+    else
+        table.cell(tabela, 0, 0, "", bgcolor = color.new(color.black, 100))
 
     if str.length(dados) > 2
         // Tira o prefixo do ticker, se vier. Usa split em vez de procurar a
@@ -137,3 +147,10 @@ if barstate.islast
         if ver_gex
             for i = 1 to qtd_gex
                 marcar(buscar("GEX" + str.tostring(i)), "GEX " + str.tostring(i), cor_gex, line.style_dotted)
+
+        // Se o texto veio mas nenhum nivel foi reconhecido, avisa em vez de
+        // ficar sem desenhar nada.
+        if array.size(nomes) == 0
+            table.cell(tabela, 0, 0, "GEX: texto colado, mas nenhum nivel reconhecido", text_color = cor_put, text_size = size.normal, bgcolor = color.new(color.black, 20))
+        else if array.size(linhas) == 0
+            table.cell(tabela, 0, 0, "GEX: " + str.tostring(array.size(nomes)) + " niveis lidos, mas nada marcado para mostrar", text_color = cor_put, text_size = size.normal, bgcolor = color.new(color.black, 20))
