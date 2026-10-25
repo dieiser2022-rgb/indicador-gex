@@ -53,8 +53,29 @@ Três coisas que o indicador tolera de propósito:
 | `1D Min` e `1D Max` | faixa esperada do dia | cinza, pontilhada |
 | `GEX 1` a `GEX 10` | strikes de maior concentração | azul, pontilhada |
 
-Tudo é configurável nas opções do indicador: quais níveis mostrar, as cores,
-a espessura, o comprimento da linha e o tamanho do texto.
+### O que dá para configurar
+
+São 48 ajustes, agrupados nas opções do indicador.
+
+**Por tipo de nível** — paredes, HVL, 0DTE, faixa do dia e GEX cada um tem o
+seu grupo, com cor, estilo da linha (cheia, tracejada ou pontilhada),
+espessura, e se mostra ou não o rótulo. Paredes e HVL deixam trocar o texto
+também: se preferir chamar `HVL` de `Inversão`, é só escrever.
+
+**Linhas, em geral** — quanto a linha se estende para trás e para frente, se
+estende até a borda do gráfico (direita, os dois lados, ou nenhum) e a
+transparência.
+
+**Rótulos, em geral** — posição (direita ou esquerda), forma (etiqueta com
+fundo ou somente o texto), distância, tamanho (de `tiny` a `large`), se mostra
+o preço junto do nome, transparência do fundo, e a opção de usar uma cor única
+para todo o texto em vez da cor de cada nível.
+
+**Zona entre as paredes** — sombreia a região entre a parede de call e a de
+put. Vem desligado; ligue em *Zona entre as paredes* se quiser o efeito.
+
+**Aviso de tela** — a mensagem que aparece quando falta colar os dados pode ser
+desligada.
 
 ### Se não compilar
 

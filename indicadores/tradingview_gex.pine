@@ -11,17 +11,18 @@
 //  O prefixo do ticker e opcional e a ordem dos campos nao importa: o script
 //  procura cada nivel pelo nome, entao campo que faltar e apenas ignorado.
 //
-//  Obs.: nenhuma linha deste arquivo e quebrada no meio de uma chamada. O Pine
+//  Obs. de manutencao: nenhuma linha e quebrada no meio de uma chamada. O Pine
 //  exige que a continuacao de linha tenha indentacao que nao seja multiplo de
-//  4 espacos, o que gera erro facil. Linhas longas, mas compilam.
+//  4 espacos, e violar isso quebra a compilacao. Linhas longas, mas seguras.
 // =============================================================================
-indicator("GEX - Niveis de Gamma", shorttitle = "GEX", overlay = true, max_lines_count = 80, max_labels_count = 80)
+indicator("GEX - Niveis de Gamma", shorttitle = "GEX", overlay = true, max_lines_count = 100, max_labels_count = 100, max_boxes_count = 20)
 
-// ----------------------------------------------------------------- entrada
+// ================================================================== entrada
 g_dados = "Dados"
 dados = input.text_area(defval = "", title = "Cole os dados aqui", group = g_dados)
+ver_aviso = input.bool(true, "Avisar na tela quando faltar dado", group = g_dados)
 
-g_ver = "O que mostrar"
+g_ver = "Mostrar ou esconder"
 ver_paredes = input.bool(true, "Paredes de call e put", group = g_ver)
 ver_hvl = input.bool(true, "Inversao gama (HVL)", group = g_ver)
 ver_0dte = input.bool(true, "Niveis 0DTE", group = g_ver)
@@ -29,29 +30,86 @@ ver_faixa = input.bool(true, "Faixa do dia (1D Min e Max)", group = g_ver)
 ver_gex = input.bool(true, "GEX por strike", group = g_ver)
 qtd_gex = input.int(10, "Quantos GEX mostrar", minval = 1, maxval = 10, group = g_ver)
 
-g_cor = "Cores"
-cor_call = input.color(#4ade80, "Parede de call", group = g_cor)
-cor_put = input.color(#f87171, "Parede de put", group = g_cor)
-cor_hvl = input.color(#fbbf24, "Inversao gama", group = g_cor)
-cor_0dte = input.color(#c084fc, "Gamma wall 0DTE", group = g_cor)
-cor_gex = input.color(#38bdf8, "GEX por strike", group = g_cor)
-cor_faixa = input.color(#94a3b8, "Faixa do dia", group = g_cor)
+// ----------------------------------------------------- estilo por tipo de nivel
+ESTILOS = ["Cheia", "Tracejada", "Pontilhada"]
 
-g_est = "Estilo"
-comprimento = input.int(150, "Comprimento da linha (barras)", minval = 5, group = g_est)
-espessura = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_est)
-tam_texto = input.string("small", "Tamanho do texto", options = ["tiny", "small", "normal"], group = g_est)
-ver_preco = input.bool(true, "Mostrar o preco no rotulo", group = g_est)
-transparencia = input.int(88, "Transparencia do rotulo", minval = 0, maxval = 100, group = g_est)
+g_pa = "Paredes de call e put"
+cor_call = input.color(#4ade80, "Cor da parede de call", group = g_pa)
+cor_put = input.color(#f87171, "Cor da parede de put", group = g_pa)
+est_paredes = input.string("Cheia", "Estilo da linha", options = ESTILOS, group = g_pa)
+esp_paredes = input.int(2, "Espessura", minval = 1, maxval = 4, group = g_pa)
+rot_paredes = input.bool(true, "Mostrar rotulo", group = g_pa)
+txt_call = input.string("Call Resistance", "Texto da parede de call", group = g_pa)
+txt_put = input.string("Put Support", "Texto da parede de put", group = g_pa)
 
-// --------------------------------------------------------------- auxiliares
+g_hv = "Inversao gama (HVL)"
+cor_hvl = input.color(#fbbf24, "Cor", group = g_hv)
+est_hvl = input.string("Tracejada", "Estilo da linha", options = ESTILOS, group = g_hv)
+esp_hvl = input.int(2, "Espessura", minval = 1, maxval = 4, group = g_hv)
+rot_hvl = input.bool(true, "Mostrar rotulo", group = g_hv)
+txt_hvl = input.string("HVL", "Texto", group = g_hv)
+
+g_0d = "Niveis 0DTE"
+cor_call0 = input.color(#4ade80, "Cor do call 0DTE", group = g_0d)
+cor_put0 = input.color(#f87171, "Cor do put 0DTE", group = g_0d)
+cor_muro0 = input.color(#c084fc, "Cor do gamma wall 0DTE", group = g_0d)
+est_0dte = input.string("Pontilhada", "Estilo da linha", options = ESTILOS, group = g_0d)
+esp_0dte = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_0d)
+rot_0dte = input.bool(true, "Mostrar rotulo", group = g_0d)
+
+g_fx = "Faixa do dia"
+cor_faixa = input.color(#94a3b8, "Cor", group = g_fx)
+est_faixa = input.string("Pontilhada", "Estilo da linha", options = ESTILOS, group = g_fx)
+esp_faixa = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_fx)
+rot_faixa = input.bool(true, "Mostrar rotulo", group = g_fx)
+
+g_gx = "GEX por strike"
+cor_gex = input.color(#38bdf8, "Cor", group = g_gx)
+est_gex = input.string("Pontilhada", "Estilo da linha", options = ESTILOS, group = g_gx)
+esp_gex = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_gx)
+rot_gex = input.bool(true, "Mostrar rotulo", group = g_gx)
+
+// ------------------------------------------------------------- linhas, geral
+g_li = "Linhas (geral)"
+comprimento = input.int(150, "Comprimento para tras (barras)", minval = 0, group = g_li)
+avanco = input.int(10, "Comprimento para frente (barras)", minval = 0, group = g_li)
+extensao = input.string("Direita", "Estender", options = ["Direita", "Ambos os lados", "Nao estender"], group = g_li)
+transp_linha = input.int(0, "Transparencia da linha", minval = 0, maxval = 100, group = g_li)
+
+// ------------------------------------------------------------ rotulos, geral
+g_ro = "Rotulos (geral)"
+lado_rotulo = input.string("Direita", "Posicao", options = ["Direita", "Esquerda"], group = g_ro)
+forma_rotulo = input.string("Etiqueta", "Forma", options = ["Etiqueta", "Somente texto"], group = g_ro)
+afastamento = input.int(3, "Afastamento do rotulo (barras)", minval = 0, group = g_ro)
+tam_texto = input.string("small", "Tamanho do texto", options = ["tiny", "small", "normal", "large"], group = g_ro)
+ver_preco = input.bool(true, "Mostrar o preco junto do nome", group = g_ro)
+cor_texto_fixa = input.bool(false, "Usar uma cor unica para todo texto", group = g_ro)
+cor_texto = input.color(#e2e8f0, "Cor unica do texto", group = g_ro)
+transparencia = input.int(88, "Transparencia do fundo do rotulo", minval = 0, maxval = 100, group = g_ro)
+
+// -------------------------------------------------------- zona entre paredes
+g_zo = "Zona entre as paredes"
+ver_zona = input.bool(false, "Sombrear entre as paredes", group = g_zo)
+cor_zona = input.color(#38bdf8, "Cor da zona", group = g_zo)
+transp_zona = input.int(92, "Transparencia da zona", minval = 0, maxval = 100, group = g_zo)
+
+// ============================================================== auxiliares
 // Normaliza para comparar: maiusculas e sem espacos. Resolve de uma vez o
 // espaco que vem depois da virgula, sem depender de str.trim.
 norm(s) =>
     str.replace_all(str.upper(s), " ", "")
 
+estilo_de(nome) =>
+    nome == "Cheia" ? line.style_solid : nome == "Tracejada" ? line.style_dashed : line.style_dotted
+
 tamanho_texto() =>
-    tam_texto == "tiny" ? size.tiny : tam_texto == "normal" ? size.normal : size.small
+    tam_texto == "tiny" ? size.tiny : tam_texto == "normal" ? size.normal : tam_texto == "large" ? size.large : size.small
+
+extensao_de() =>
+    extensao == "Direita" ? extend.right : extensao == "Ambos os lados" ? extend.both : extend.none
+
+forma_de() =>
+    forma_rotulo == "Somente texto" ? label.style_none : lado_rotulo == "Direita" ? label.style_label_left : label.style_label_right
 
 // pares nome/valor lidos do texto colado
 var nomes = array.new_string()
@@ -60,6 +118,7 @@ var valores = array.new_float()
 // desenhos da passada anterior, guardados para poder apagar
 var linhas = array.new_line()
 var rotulos = array.new_label()
+var zonas = array.new_box()
 
 apagar_tudo() =>
     if array.size(linhas) > 0
@@ -70,6 +129,10 @@ apagar_tudo() =>
         for i = 0 to array.size(rotulos) - 1
             label.delete(array.get(rotulos, i))
         array.clear(rotulos)
+    if array.size(zonas) > 0
+        for i = 0 to array.size(zonas) - 1
+            box.delete(array.get(zonas, i))
+        array.clear(zonas)
 
 buscar(chave) =>
     achado = float(na)
@@ -79,31 +142,38 @@ buscar(chave) =>
                 achado := array.get(valores, i)
     achado
 
-marcar(preco, texto, cor, estilo) =>
+marcar(preco, texto, cor, estilo, espessura, com_rotulo) =>
     if not na(preco) and preco > 0
-        linha = line.new(bar_index - comprimento, preco, bar_index, preco, extend = extend.right, color = cor, style = estilo, width = espessura)
+        linha = line.new(bar_index - comprimento, preco, bar_index + avanco, preco, extend = extensao_de(), color = color.new(cor, transp_linha), style = estilo, width = espessura)
         array.push(linhas, linha)
-        escrito = ver_preco ? texto + "   " + str.tostring(preco, format.mintick) : texto
-        etiqueta = label.new(bar_index + 3, preco, escrito, style = label.style_label_left, color = color.new(cor, transparencia), textcolor = cor, size = tamanho_texto())
-        array.push(rotulos, etiqueta)
+        if com_rotulo
+            escrito = ver_preco ? texto + "   " + str.tostring(preco, format.mintick) : texto
+            onde = lado_rotulo == "Direita" ? bar_index + avanco + afastamento : bar_index - comprimento - afastamento
+            fundo = forma_rotulo == "Somente texto" ? color.new(color.black, 100) : color.new(cor, transparencia)
+            tinta = cor_texto_fixa ? cor_texto : cor
+            etiqueta = label.new(onde, preco, escrito, style = forma_de(), color = fundo, textcolor = tinta, size = tamanho_texto())
+            array.push(rotulos, etiqueta)
 
-// Aviso na tela quando o campo de dados esta vazio. Sem isso o indicador fica
-// invisivel e nao da para saber se ele carregou, se compilou ou se falta
-// colar o texto.
+// aviso de estado, para o indicador nunca ficar invisivel sem explicacao
 var tabela = table.new(position.top_right, 1, 1, border_width = 1)
 
-// ------------------------------------------------------------------ desenho
+avisar(txt, cor) =>
+    if ver_aviso
+        table.cell(tabela, 0, 0, txt, text_color = cor, text_size = size.normal, bgcolor = color.new(color.black, 20))
+
+limpar_aviso() =>
+    table.cell(tabela, 0, 0, "", bgcolor = color.new(color.black, 100))
+
+// ================================================================= desenho
 if barstate.islast
     apagar_tudo()
     array.clear(nomes)
     array.clear(valores)
+    limpar_aviso()
 
     if str.length(dados) <= 2
-        table.cell(tabela, 0, 0, "GEX: cole os dados nas configuracoes do indicador", text_color = cor_hvl, text_size = size.normal, bgcolor = color.new(color.black, 20))
+        avisar("GEX: cole os dados nas configuracoes do indicador", cor_hvl)
     else
-        table.cell(tabela, 0, 0, "", bgcolor = color.new(color.black, 100))
-
-    if str.length(dados) > 2
         // Tira o prefixo do ticker, se vier. Usa split em vez de procurar a
         // posicao do caractere, que nem toda versao do Pine oferece.
         texto = dados
@@ -127,30 +197,36 @@ if barstate.islast
                     array.push(valores, valor)
                     pendente := ""
 
-        if ver_paredes
-            marcar(buscar("CALLRESISTANCE"), "Call Resistance", cor_call, line.style_solid)
-            marcar(buscar("PUTSUPPORT"), "Put Support", cor_put, line.style_solid)
-
-        if ver_hvl
-            marcar(buscar("HVL"), "HVL", cor_hvl, line.style_dashed)
-
-        if ver_0dte
-            marcar(buscar("CALLRESISTANCE0DTE"), "Call Resist 0DTE", cor_call, line.style_dotted)
-            marcar(buscar("PUTSUPPORT0DTE"), "Put Support 0DTE", cor_put, line.style_dotted)
-            marcar(buscar("HVL0DTE"), "HVL 0DTE", cor_hvl, line.style_dotted)
-            marcar(buscar("GAMMAWALL0DTE"), "Gamma Wall 0DTE", cor_0dte, line.style_solid)
-
-        if ver_faixa
-            marcar(buscar("1DMIN"), "1D Min", cor_faixa, line.style_dotted)
-            marcar(buscar("1DMAX"), "1D Max", cor_faixa, line.style_dotted)
-
-        if ver_gex
-            for i = 1 to qtd_gex
-                marcar(buscar("GEX" + str.tostring(i)), "GEX " + str.tostring(i), cor_gex, line.style_dotted)
-
-        // Se o texto veio mas nenhum nivel foi reconhecido, avisa em vez de
-        // ficar sem desenhar nada.
         if array.size(nomes) == 0
-            table.cell(tabela, 0, 0, "GEX: texto colado, mas nenhum nivel reconhecido", text_color = cor_put, text_size = size.normal, bgcolor = color.new(color.black, 20))
-        else if array.size(linhas) == 0
-            table.cell(tabela, 0, 0, "GEX: " + str.tostring(array.size(nomes)) + " niveis lidos, mas nada marcado para mostrar", text_color = cor_put, text_size = size.normal, bgcolor = color.new(color.black, 20))
+            avisar("GEX: texto colado, mas nenhum nivel reconhecido", cor_put)
+        else
+            parede_call = buscar("CALLRESISTANCE")
+            parede_put = buscar("PUTSUPPORT")
+
+            if ver_zona and not na(parede_call) and not na(parede_put)
+                caixa = box.new(bar_index - comprimento, parede_call, bar_index + avanco, parede_put, border_color = color.new(cor_zona, 100), bgcolor = color.new(cor_zona, transp_zona), extend = extensao_de())
+                array.push(zonas, caixa)
+
+            if ver_paredes
+                marcar(parede_call, txt_call, cor_call, estilo_de(est_paredes), esp_paredes, rot_paredes)
+                marcar(parede_put, txt_put, cor_put, estilo_de(est_paredes), esp_paredes, rot_paredes)
+
+            if ver_hvl
+                marcar(buscar("HVL"), txt_hvl, cor_hvl, estilo_de(est_hvl), esp_hvl, rot_hvl)
+
+            if ver_0dte
+                marcar(buscar("CALLRESISTANCE0DTE"), "Call Resist 0DTE", cor_call0, estilo_de(est_0dte), esp_0dte, rot_0dte)
+                marcar(buscar("PUTSUPPORT0DTE"), "Put Support 0DTE", cor_put0, estilo_de(est_0dte), esp_0dte, rot_0dte)
+                marcar(buscar("HVL0DTE"), "HVL 0DTE", cor_hvl, estilo_de(est_0dte), esp_0dte, rot_0dte)
+                marcar(buscar("GAMMAWALL0DTE"), "Gamma Wall 0DTE", cor_muro0, estilo_de(est_0dte), esp_0dte, rot_0dte)
+
+            if ver_faixa
+                marcar(buscar("1DMIN"), "1D Min", cor_faixa, estilo_de(est_faixa), esp_faixa, rot_faixa)
+                marcar(buscar("1DMAX"), "1D Max", cor_faixa, estilo_de(est_faixa), esp_faixa, rot_faixa)
+
+            if ver_gex
+                for i = 1 to qtd_gex
+                    marcar(buscar("GEX" + str.tostring(i)), "GEX " + str.tostring(i), cor_gex, estilo_de(est_gex), esp_gex, rot_gex)
+
+            if array.size(linhas) == 0
+                avisar("GEX: " + str.tostring(array.size(nomes)) + " niveis lidos, mas nada marcado para mostrar", cor_put)
