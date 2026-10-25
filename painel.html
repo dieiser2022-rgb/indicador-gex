@@ -165,10 +165,13 @@ button:disabled { background: #334155; cursor: wait; }
 
 /* ---------- 9: exportar ---------- */
 .ex h2 { display: flex; align-items: center; justify-content: space-between;
-         gap: 8px; }
-.atalhos { display: flex; gap: 10px; }
-.atalhos label { display: flex; align-items: center; gap: 4px; cursor: pointer;
-                 font-size: 10px; letter-spacing: .5px; color: var(--apagado); }
+         gap: 6px; flex-wrap: wrap; }
+/* com quatro opcoes o espaco fica justo: deixa quebrar para a linha de baixo
+   em vez de espremer ou cortar */
+.atalhos { display: flex; gap: 9px; flex-wrap: wrap; }
+.atalhos label { display: flex; align-items: center; gap: 3px; cursor: pointer;
+                 font-size: 10px; letter-spacing: .3px; color: var(--apagado);
+                 white-space: nowrap; }
 .atalhos label:hover { color: var(--texto); }
 .atalhos input { accent-color: var(--destaque); margin: 0; cursor: pointer; }
 .ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
@@ -254,6 +257,8 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
         <span class="atalhos">
           <label><input type="radio" name="tkbase" value="USTEC"> USTEC</label>
           <label><input type="radio" name="tkbase" value="US100"> US100</label>
+          <label><input type="radio" name="tkbase" value="NQ"> NQ</label>
+          <label><input type="radio" name="tkbase" value="MNQ"> MNQ</label>
         </span>
       </h2>
       <div class="expLinha">
