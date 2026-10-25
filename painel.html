@@ -40,20 +40,20 @@ button:disabled { background: #334155; cursor: wait; }
   grid-template-areas:
     "topo   topo    topo"
     "manha  grafico news"
-    "cards  cards   cards"
-    "export export  export";
+    "cards  cards   cards";
 }
 /* a linha de cima e um flex: assim a caixa do GEX fica estreita em vez de
    esticar junto com o texto do market maker, que e comprido */
 .topo { grid-area: topo; display: flex; gap: 12px; align-items: flex-start; }
-.topo .ag { width: 300px; flex: none; }
-.topo .rg { width: 215px; flex: none; }
+.topo .ag { width: 290px; flex: none; }
+.topo .rg { width: 200px; flex: none; }
 .topo .dc { flex: 1; min-width: 0; }
+.topo .ex { width: 268px; flex: none; }
 @media (max-width: 1250px) {
   .grade { grid-template-columns: 1fr;
-    grid-template-areas: "topo" "grafico" "manha" "news" "cards" "export"; }
+    grid-template-areas: "topo" "grafico" "manha" "news" "cards"; }
   .topo { flex-wrap: wrap; }
-  .topo .ag, .topo .rg, .topo .dc { width: 100%; }
+  .topo .ag, .topo .rg, .topo .dc, .topo .ex { width: 100%; }
 }
 .caixa {
   background: var(--painel); border: 1px solid var(--borda);
@@ -155,8 +155,16 @@ button:disabled { background: #334155; cursor: wait; }
        border-top: 1px dashed var(--borda); }
 
 /* ---------- 9: exportar ---------- */
-.ex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.ex .aviso { color: var(--apagado); font-size: 11.5px; }
+.ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
+             margin-top: 8px; display: block; }
+.expLinha { display: flex; gap: 6px; margin-bottom: 7px; }
+.expLinha button.ger { flex: 1; min-width: 0; padding: 9px 8px; font-size: 12px;
+                       text-align: left; }
+.expLinha button.cop { width: 40px; flex: none; padding: 9px 0;
+                       background: transparent; border: 1px solid var(--borda);
+                       color: var(--apagado); font-size: 11px; }
+.expLinha button.cop:hover { color: var(--texto); border-color: var(--destaque); }
+.expLinha button.cop.ok { color: var(--alta); border-color: var(--alta); }
 
 /* ---------- modais e config ---------- */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.7);
@@ -211,6 +219,24 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
       <h2>3 &middot; Como o market maker tende a agir</h2>
       <div id="dica"><span class="vazio">aguardando...</span></div>
     </div>
+
+    <div class="caixa ex">
+      <h2>9 &middot; Gerar GEX</h2>
+      <div class="expLinha">
+        <button class="ger" data-destino="mt5">MetaTrader 5</button>
+        <button class="cop" data-copia="mt5" title="copiar os niveis">copiar</button>
+      </div>
+      <div class="expLinha">
+        <button class="ger" data-destino="tradingview">TradingView</button>
+        <button class="cop" data-copia="tradingview" title="copiar os niveis">copiar</button>
+      </div>
+      <div class="expLinha">
+        <button class="ger" data-destino="ninjatrader">NinjaTrader</button>
+        <button class="cop" data-copia="ninjatrader" title="copiar os niveis">copiar</button>
+      </div>
+      <span class="aviso">Por enquanto abre os niveis em texto.
+        O arquivo de cada plataforma ainda nao foi feito.</span>
+    </div>
   </div>
 
   <div class="caixa gr">
@@ -262,14 +288,6 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
   <div class="caixa cd">
     <h2>8 &middot; Niveis por ativo</h2>
     <div class="cards" id="cards"><span class="vazio">aguardando...</span></div>
-  </div>
-
-  <div class="caixa ex">
-    <button data-destino="mt5">Gerar GEX MT5</button>
-    <button data-destino="tradingview">Gerar GEX TradingView</button>
-    <button data-destino="ninjatrader">Gerar GEX NinjaTrader</button>
-    <span class="aviso">9 &middot; so o layout por enquanto - os botoes mostram
-      os niveis em texto para copiar</span>
   </div>
 
 </div>
@@ -714,19 +732,41 @@ function montaEditorCores() {
 }
 
 /* ---------------------------------------------------- 9: exportar */
-async function exportar(destino) {
+async function textoNiveis(destino) {
   const simbolo = $("#selAtivo").value;
   const d = await pega("/api/exportar?destino=" + destino
     + "&simbolo=" + encodeURIComponent(simbolo));
-  $("#tituloExport").textContent = "Niveis para " + destino.toUpperCase();
-  $("#avisoExport").textContent = d.aviso || "";
   const linhas = (d.niveis || []).map(n =>
     n.rotulo.padEnd(22) + num(n.preco, 2) + (n.exato ? "" : "   (aproximado)"));
-  $("#saidaExport").textContent = linhas.length
+  const corpo = linhas.length
     ? (simbolo + "  -  " + new Date().toLocaleString("pt-BR") + "\n\n"
        + linhas.join("\n"))
     : "sem niveis calculados ainda - clique em ATUALIZAR REGIOES primeiro";
+  return { corpo: corpo, aviso: d.aviso || "", vazio: !linhas.length };
+}
+
+async function exportar(destino) {
+  const d = await textoNiveis(destino);
+  $("#tituloExport").textContent = "Niveis para " + destino.toUpperCase();
+  $("#avisoExport").textContent = d.aviso;
+  $("#saidaExport").textContent = d.corpo;
   $("#modalExport").classList.add("on");
+}
+
+async function copiarNiveis(destino, botao) {
+  const antes = botao.textContent;
+  try {
+    const d = await textoNiveis(destino);
+    await navigator.clipboard.writeText(d.corpo);
+    botao.textContent = d.vazio ? "vazio" : "ok";
+    botao.classList.toggle("ok", !d.vazio);
+  } catch (e) {
+    botao.textContent = "erro";
+  }
+  setTimeout(() => {
+    botao.textContent = antes;
+    botao.classList.remove("ok");
+  }, 1600);
 }
 
 /* ---------------------------------------------------- atualizar tudo */
@@ -816,6 +856,9 @@ $("#selDias").addEventListener("change", () => {
 });
 document.querySelectorAll(".ex button[data-destino]").forEach(b => {
   b.addEventListener("click", () => exportar(b.dataset.destino));
+});
+document.querySelectorAll(".ex button[data-copia]").forEach(b => {
+  b.addEventListener("click", () => copiarNiveis(b.dataset.copia, b));
 });
 $("#btCopiar").addEventListener("click", () => {
   navigator.clipboard.writeText($("#saidaExport").textContent);

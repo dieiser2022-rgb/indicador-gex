@@ -24,16 +24,33 @@ CALENDARIO_URLS = [
 # As internacionais entram depois e passam pelo tradutor.
 # Evitar feeds "top stories" de portais: eles trazem financas pessoais
 # ("devo vender minha casa?"), que nao servem para operar.
+# Usar sempre o feed da SECAO de mercado, nunca o feed geral do portal.
+# O feed geral publica tudo: loteria, politica, celebridade. Ja aconteceu
+# duas vezes de entrar lixo no painel por causa disso.
 NOTICIAS_RSS = [
-    ("InfoMoney", "https://www.infomoney.com.br/feed/", "pt"),
     ("InfoMoney mercados", "https://www.infomoney.com.br/mercados/feed/", "pt"),
+    ("InfoMoney economia", "https://www.infomoney.com.br/economia/feed/", "pt"),
+    ("InfoMoney onde investir", "https://www.infomoney.com.br/onde-investir/feed/", "pt"),
     ("Investing BR", "https://br.investing.com/rss/news_25.rss", "pt"),
     ("Investing BR economia", "https://br.investing.com/rss/news_14.rss", "pt"),
-    ("Money Times", "https://www.moneytimes.com.br/feed/", "pt"),
+    ("Money Times mercados", "https://www.moneytimes.com.br/mercados/feed/", "pt"),
     ("MarketWatch mercados", "https://feeds.content.dowjones.io/public/rss/mw_marketpulse", "en"),
     ("CNBC mercados", "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258", "en"),
     ("Investing mercados", "https://www.investing.com/rss/news_25.rss", "en"),
 ]
+
+# Rede de seguranca: mesmo no feed de secao as vezes escapa conteudo que nao
+# serve para operar. Se o titulo tiver qualquer um destes termos, ele cai fora.
+NOTICIAS_BLOQUEAR = (
+    "mega-sena", "mega sena", "megasena", "quina", "lotofacil", "lotofácil",
+    "lotomania", "timemania", "dia de sorte", "super sete", "loteria",
+    "concurso ", "sorteio", "resultado do concurso", "premio acumulado",
+    "+milionaria", "+milionária", "milionario hoje", "milionário hoje",
+    "horoscopo", "horóscopo", "signo", "receita federal consulta",
+    "bolsa familia", "bolsa família", "inss calendario", "inss calendário",
+    "novela", "bbb", "big brother", "libertadores", "brasileirao",
+    "brasileirão", "escalacao", "escalação", "palpites para",
+)
 
 # eventos de calendario que nao servem para nada ao operar
 AGENDA_IGNORAR = ("daylight saving", "horario de verao", "bank holiday",
@@ -389,7 +406,10 @@ def noticias(limite=14, traduzir_ingles=True):
     vistos = set()
     unicas = []
     for n in sorted(todas, key=lambda x: x["ts"], reverse=True):
-        chave = n["titulo"][:70].lower()
+        baixo = n["titulo"].lower()
+        if any(p in baixo for p in NOTICIAS_BLOQUEAR):
+            continue
+        chave = baixo[:70]
         if chave in vistos:
             continue
         vistos.add(chave)
