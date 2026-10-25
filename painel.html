@@ -168,45 +168,26 @@ button:disabled { background: #334155; cursor: wait; }
          gap: 6px; flex-wrap: wrap; }
 /* com quatro opcoes o espaco fica justo: deixa quebrar para a linha de baixo
    em vez de espremer ou cortar */
-/* A base de preco e a unica escolha que muda os numeros, entao fica em
-   destaque. O nome do ativo e so etiqueta e vive no campo de cada linha. */
-.baseGeral { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; }
-.baseGeral .rot { color: var(--apagado); font-size: 10px; letter-spacing: 1px;
-                  text-transform: uppercase; margin-right: auto; }
-.baseGeral button { padding: 6px 12px; font-size: 10.5px; font-weight: bold;
-                    letter-spacing: .5px; background: transparent;
-                    border: 1px solid var(--borda); color: var(--apagado); }
-.baseGeral button.ativo { background: var(--botao); color: #fff;
-                          border-color: var(--botao); }
+/* O caminho normal e um botao so, para MNQ. O USTEC fica atras de uma
+   caixinha porque e o caso em que a base de preco pode mudar. */
+#btGerar { width: 100%; padding: 13px 10px; font-size: 13px; font-weight: bold;
+           letter-spacing: .5px; }
+#estadoGerar { min-height: 14px; margin: 6px 0 2px; }
+.opcao { display: flex; align-items: center; gap: 6px; cursor: pointer;
+         font-size: 11.5px; color: var(--apagado); margin: 8px 0 0; }
+.opcao:hover { color: var(--texto); }
+.opcao input { accent-color: var(--destaque); margin: 0; cursor: pointer; }
+.escondido { display: none; }
+.linhaUstec { display: flex; align-items: center; gap: 7px; margin: 8px 0 4px;
+              font-size: 11.5px; color: var(--apagado); }
+#btVer { width: 100%; margin-top: 10px; font-size: 11.5px; }
 .ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
              margin-top: 8px; display: block; }
-/* quatro colunas alinhadas: plataforma | ticker | base | copiar */
-.expLinha { display: grid; grid-template-columns: 1fr 62px 38px 44px; gap: 4px;
-            margin-bottom: 6px; }
-.expLinha button.base { padding: 0; background: transparent;
-                        border: 1px solid var(--borda); color: var(--apagado);
-                        font-size: 9.5px; font-weight: bold; }
-.expLinha button.base.fut { color: var(--destaque);
-                            border-color: var(--destaque); }
-.expLinha button.base.idx { color: var(--inversao);
-                            border-color: var(--inversao); }
-.expLinha > * { height: 34px; }
-.expLinha button.ger { min-width: 0; padding: 0 10px; font-size: 12px;
-                       text-align: left; overflow: hidden;
-                       text-overflow: ellipsis; white-space: nowrap; }
-.expLinha input.tick { background: var(--fundo); color: var(--texto);
-                       border: 1px solid var(--borda); border-radius: 8px;
-                       padding: 0 6px; font-family: inherit; font-size: 11.5px;
-                       text-align: center; text-transform: uppercase;
-                       min-width: 0; }
-.expLinha input.tick:focus { outline: 0; border-color: var(--destaque); }
-.expLinha input.tick::placeholder { color: var(--apagado); opacity: .55;
-                                    text-transform: none; }
-.expLinha button.cop { padding: 0; background: transparent;
-                       border: 1px solid var(--borda);
-                       color: var(--apagado); font-size: 10.5px; }
-.expLinha button.cop:hover { color: var(--texto); border-color: var(--destaque); }
-.expLinha button.cop.ok { color: var(--alta); border-color: var(--alta); }
+button.base { padding: 5px 11px; background: transparent;
+              border: 1px solid var(--borda); color: var(--apagado);
+              font-size: 10px; font-weight: bold; }
+button.base.fut { color: var(--destaque); border-color: var(--destaque); }
+button.base.idx { color: var(--inversao); border-color: var(--inversao); }
 
 /* ---------- modais e config ---------- */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.7);
@@ -265,41 +246,24 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
 
     <div class="caixa ex">
       <h2>9 &middot; Gerar GEX</h2>
-      <div class="baseGeral">
-        <span class="rot">Base de preco</span>
-        <button data-tudo="futuro" title="NQ, MNQ, NQ1! e a maioria dos CFD">
-          FUTURO</button>
-        <button data-tudo="indice" title="alguns CFD seguem o indice a vista">
-          INDICE</button>
+      <button id="btGerar">COPIAR NIVEIS - MNQ</button>
+      <div id="estadoGerar" class="aviso"></div>
+
+      <label class="opcao">
+        <input type="checkbox" id="chkUstec"> gerar para USTEC (MetaTrader)
+      </label>
+
+      <div id="caixaUstec" class="escondido">
+        <div class="linhaUstec">
+          <span>O USTEC da sua corretora segue</span>
+          <button class="base" data-base="mt5">FUT</button>
+        </div>
+        <span class="aviso">Veja o preco do USTEC no MetaTrader: se estiver
+          perto do indice, troque para <b>IDX</b>. A diferenca passa de 200
+          pontos.</span>
       </div>
-      <div class="expLinha">
-        <button class="ger" data-destino="mt5">MetaTrader 5</button>
-        <input class="tick" data-tick="mt5" placeholder="USTEC"
-               title="como a plataforma chama o Nasdaq" spellcheck="false">
-        <button class="base" data-base="mt5"
-                title="a plataforma cota o futuro ou o indice a vista?">FUT</button>
-        <button class="cop" data-copia="mt5" title="copiar os niveis">copiar</button>
-      </div>
-      <div class="expLinha">
-        <button class="ger" data-destino="tradingview">TradingView</button>
-        <input class="tick" data-tick="tradingview" placeholder="US100"
-               title="como a plataforma chama o Nasdaq" spellcheck="false">
-        <button class="base" data-base="tradingview"
-                title="a plataforma cota o futuro ou o indice a vista?">FUT</button>
-        <button class="cop" data-copia="tradingview" title="copiar os niveis">copiar</button>
-      </div>
-      <div class="expLinha">
-        <button class="ger" data-destino="ninjatrader">NinjaTrader</button>
-        <input class="tick" data-tick="ninjatrader" placeholder="NQ"
-               title="como a plataforma chama o Nasdaq" spellcheck="false">
-        <button class="base" data-base="ninjatrader"
-                title="a plataforma cota o futuro ou o indice a vista?">FUT</button>
-        <button class="cop" data-copia="ninjatrader" title="copiar os niveis">copiar</button>
-      </div>
-      <span class="aviso">O nome e so etiqueta: <b>NQ</b>, <b>MNQ</b> e
-        <b>NQ1!</b> dao os mesmos numeros. O que muda os valores e a base -
-        <b>FUT</b> ou <b>IDX</b> -, porque entre futuro e indice ha mais de
-        200 pontos de diferenca no Nasdaq.</span>
+
+      <button class="fantasma" id="btVer">ver os niveis antes de colar</button>
     </div>
   </div>
 
@@ -790,32 +754,12 @@ async function carregaConfig() {
     aplicaCores(estado.cores);
     if (cfg.dias_max) $("#selDias").value = String(cfg.dias_max);
     if (cfg.grafico) $("#selAtivo").value = cfg.grafico;
-    const tk = cfg.tickers || {};
-    document.querySelectorAll("input.tick").forEach(i => {
-      if (tk[i.dataset.tick]) i.value = tk[i.dataset.tick];
-    });
     const bs = cfg.bases || {};
     document.querySelectorAll("button.base").forEach(b => {
       pintaBase(b, bs[b.dataset.base] || "futuro");
     });
-    marcaBaseGeral();
+    ajustaCaixaUstec();
   } catch (e) { }
-}
-
-let aguardaTicker = null;
-function salvaTickers() {
-  clearTimeout(aguardaTicker);
-  // espera o usuario parar de digitar antes de gravar
-  aguardaTicker = setTimeout(() => {
-    const tickers = {};
-    document.querySelectorAll("input.tick").forEach(i => {
-      tickers[i.dataset.tick] = i.value.trim().toUpperCase();
-    });
-    fetch("/api/config", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tickers: tickers })
-    }).catch(() => { });
-  }, 600);
 }
 
 function pintaBase(botao, valor) {
@@ -823,17 +767,6 @@ function pintaBase(botao, valor) {
   botao.classList.toggle("fut", valor !== "indice");
   botao.classList.toggle("idx", valor === "indice");
   botao.dataset.valor = valor;
-}
-
-// O botao grande fica aceso so quando as tres linhas concordam; se uma for
-// diferente, nenhum dos dois acende, deixando claro que ha excecao.
-function marcaBaseGeral() {
-  const valores = [...document.querySelectorAll("button.base")]
-    .map(b => b.dataset.valor || "futuro");
-  const todas = valores.every(v => v === valores[0]) ? valores[0] : "";
-  document.querySelectorAll(".baseGeral button").forEach(b => {
-    b.classList.toggle("ativo", b.dataset.tudo === todas);
-  });
 }
 
 function salvaBases() {
@@ -934,22 +867,6 @@ async function exportar(destino) {
   }
 }
 
-async function copiarNiveis(destino, botao) {
-  const antes = botao.textContent;
-  try {
-    const d = await textoNiveis(destino);
-    await navigator.clipboard.writeText(d.corpo);
-    botao.textContent = d.vazio ? "vazio" : "ok";
-    botao.classList.toggle("ok", !d.vazio);
-  } catch (e) {
-    botao.textContent = "erro";
-  }
-  setTimeout(() => {
-    botao.textContent = antes;
-    botao.classList.remove("ok");
-  }, 1600);
-}
-
 /* ---------------------------------------------------- atualizar tudo */
 async function atualizarTudo() {
   const bt = $("#atualizar");
@@ -1034,30 +951,51 @@ $("#btResetCores").addEventListener("click", async () => {
 $("#selDias").addEventListener("change", () => {
   $("#status").textContent = "vencimento alterado - clique em atualizar";
 });
-document.querySelectorAll(".ex button[data-destino]").forEach(b => {
-  b.addEventListener("click", () => exportar(b.dataset.destino));
+// Qual destino usar: o normal e o MNQ; o USTEC entra so se marcado.
+function destinoAtual() {
+  return $("#chkUstec").checked ? "mt5" : "tradingview";
+}
+
+function ajustaCaixaUstec() {
+  const usando = $("#chkUstec").checked;
+  $("#caixaUstec").classList.toggle("escondido", !usando);
+  $("#btGerar").textContent = "COPIAR NIVEIS - " + (usando ? "USTEC" : "MNQ");
+  $("#estadoGerar").textContent = "";
+}
+
+$("#chkUstec").addEventListener("change", ajustaCaixaUstec);
+
+$("#btGerar").addEventListener("click", async () => {
+  const bt = $("#btGerar");
+  const estado = $("#estadoGerar");
+  bt.disabled = true;
+  estado.textContent = "gerando...";
+  try {
+    const d = await textoNiveis(destinoAtual());
+    if (d.erro) {
+      estado.textContent = d.erro;
+    } else if (d.vazio) {
+      estado.textContent = "sem niveis - clique em ATUALIZAR REGIOES primeiro";
+    } else {
+      await navigator.clipboard.writeText(d.corpo);
+      const i = d.info;
+      estado.textContent = "copiado! " + i.ticker + ", base "
+        + (i.base === "indice" ? "indice" : "futuro")
+        + " - cole no indicador";
+    }
+  } catch (e) {
+    estado.textContent = "falhou: " + e.message;
+  }
+  bt.disabled = false;
 });
-document.querySelectorAll(".ex button[data-copia]").forEach(b => {
-  b.addEventListener("click", () => copiarNiveis(b.dataset.copia, b));
-});
-document.querySelectorAll("input.tick").forEach(i => {
-  i.addEventListener("input", salvaTickers);
-});
+
+$("#btVer").addEventListener("click", () => exportar(destinoAtual()));
+
 document.querySelectorAll("button.base").forEach(b => {
   b.addEventListener("click", () => {
     pintaBase(b, b.dataset.valor === "indice" ? "futuro" : "indice");
-    marcaBaseGeral();
     salvaBases();
-  });
-});
-document.querySelectorAll(".baseGeral button").forEach(b => {
-  b.addEventListener("click", () => {
-    // troca a base das tres plataformas de uma vez
-    document.querySelectorAll("button.base").forEach(x => {
-      pintaBase(x, b.dataset.tudo);
-    });
-    marcaBaseGeral();
-    salvaBases();
+    $("#estadoGerar").textContent = "base alterada - gere de novo";
   });
 });
 $("#btCopiar").addEventListener("click", () => {

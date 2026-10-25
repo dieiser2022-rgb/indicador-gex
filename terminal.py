@@ -86,8 +86,8 @@ CORES_ANTIGAS = {"call_wall": "#f87171", "put_wall": "#4ade80"}
 # iniciais - o usuario ajusta no painel conforme a plataforma dele.
 TICKERS_PADRAO = {
     "mt5": "USTEC",
-    "tradingview": "US100",
-    "ninjatrader": "NQ",
+    "tradingview": "MNQ",
+    "ninjatrader": "MNQ",
 }
 
 # Em que preco a plataforma cota o ativo: no futuro ou no indice a vista.
