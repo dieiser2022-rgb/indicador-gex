@@ -164,6 +164,13 @@ button:disabled { background: #334155; cursor: wait; }
        border-top: 1px dashed var(--borda); }
 
 /* ---------- 9: exportar ---------- */
+.ex h2 { display: flex; align-items: center; justify-content: space-between;
+         gap: 8px; }
+.atalhos { display: flex; gap: 10px; }
+.atalhos label { display: flex; align-items: center; gap: 4px; cursor: pointer;
+                 font-size: 10px; letter-spacing: .5px; color: var(--apagado); }
+.atalhos label:hover { color: var(--texto); }
+.atalhos input { accent-color: var(--destaque); margin: 0; cursor: pointer; }
 .ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
              margin-top: 8px; display: block; }
 /* tres colunas alinhadas: plataforma | ticker | copiar */
@@ -243,7 +250,12 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
     </div>
 
     <div class="caixa ex">
-      <h2>9 &middot; Gerar GEX</h2>
+      <h2>9 &middot; Gerar GEX
+        <span class="atalhos">
+          <label><input type="radio" name="tkbase" value="USTEC"> USTEC</label>
+          <label><input type="radio" name="tkbase" value="US100"> US100</label>
+        </span>
+      </h2>
       <div class="expLinha">
         <button class="ger" data-destino="mt5">MetaTrader 5</button>
         <input class="tick" data-tick="mt5" placeholder="USTEC"
@@ -755,6 +767,13 @@ async function carregaConfig() {
     document.querySelectorAll("input.tick").forEach(i => {
       if (tk[i.dataset.tick]) i.value = tk[i.dataset.tick];
     });
+    // se os tres campos tem o mesmo nome, marca a opcao rapida correspondente
+    const valores = [...document.querySelectorAll("input.tick")]
+      .map(i => i.value.trim().toUpperCase());
+    const todosIguais = valores.every(v => v && v === valores[0]);
+    document.querySelectorAll("input[name=tkbase]").forEach(r => {
+      r.checked = todosIguais && r.value === valores[0];
+    });
   } catch (e) { }
 }
 
@@ -930,7 +949,19 @@ document.querySelectorAll(".ex button[data-copia]").forEach(b => {
   b.addEventListener("click", () => copiarNiveis(b.dataset.copia, b));
 });
 document.querySelectorAll("input.tick").forEach(i => {
-  i.addEventListener("input", salvaTickers);
+  i.addEventListener("input", () => {
+    // digitar a mao desmarca as opcoes rapidas
+    document.querySelectorAll("input[name=tkbase]").forEach(r => r.checked = false);
+    salvaTickers();
+  });
+});
+document.querySelectorAll("input[name=tkbase]").forEach(r => {
+  r.addEventListener("change", () => {
+    if (!r.checked) return;
+    // preenche os tres campos de uma vez com o nome escolhido
+    document.querySelectorAll("input.tick").forEach(i => { i.value = r.value; });
+    salvaTickers();
+  });
 });
 $("#btCopiar").addEventListener("click", () => {
   navigator.clipboard.writeText($("#saidaExport").textContent);
