@@ -151,11 +151,38 @@ button:disabled { background: #334155; cursor: wait; filter: none;
 .rb { display: flex; flex-direction: column; align-items: center;
       justify-content: center; padding: 6px; }
 #roboG { width: 100%; max-height: 132px; overflow: visible; }
-#roboFala {
-  color: var(--apagado); font-size: 9.5px; letter-spacing: 1.6px;
-  text-transform: uppercase; font-family: var(--mono); margin-top: 2px;
-  text-align: center;
+/* balao de fala: a setinha e um quadrado girado no topo */
+#balao {
+  position: relative; margin-top: 4px; width: 100%;
+  background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: 9px; padding: 7px 9px; text-align: center;
+  color: var(--texto); font-size: 10.5px; line-height: 1.35;
+  min-height: 32px; display: flex; align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(56,189,248,.10) inset;
+  transition: border-color .2s, color .2s;
 }
+#balao::before {
+  content: ""; position: absolute; top: -4px; left: 50%; width: 7px;
+  height: 7px; margin-left: -3.5px; transform: rotate(45deg);
+  background: var(--fundo);
+  border-left: 1px solid var(--borda); border-top: 1px solid var(--borda);
+}
+#balao.alerta { border-color: var(--baixa); color: var(--baixa); }
+#balao.alerta::before { border-color: var(--baixa); }
+#balao.bom { border-color: var(--alta); color: var(--alta); }
+#balao.bom::before { border-color: var(--alta); }
+#btVoz { width: 100%; margin-top: 6px; font-size: 9.5px; padding: 5px;
+         letter-spacing: 1px; text-transform: uppercase; }
+#btVoz.ligada { color: var(--destaque); border-color: var(--destaque);
+                box-shadow: 0 0 12px rgba(56,189,248,.2); }
+/* onda sonora quando esta falando */
+#roboG.falando .boca { animation: fala .35s ease-in-out infinite; }
+@keyframes fala {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(2.2); }
+}
+#roboG .boca { transform-origin: 85px 74px; }
 #roboG .cabeca {
   fill: var(--painel); stroke: var(--destaque); stroke-width: 2;
   filter: drop-shadow(0 0 10px rgba(56,189,248,.5));
@@ -541,7 +568,9 @@ table.cal tr:hover { background: rgba(148,163,184,.05); }
         </g>
         <path class="boca" d="M70 72 Q85 80 100 72"/>
       </svg>
-      <div id="roboFala">pronto</div>
+      <div id="balao">pronto</div>
+      <button class="fantasma" id="btVoz" title="ligar ou desligar a voz">
+        voz desligada</button>
     </div>
 
     <div class="caixa ex">
@@ -750,7 +779,7 @@ function mostraAgenda(d) {
 // enquanto busca, aceno verde quando acaba, cara fechada se algo falhou.
 let voltaRobo = null;
 const FALA_ROBO = {
-  pensando: "buscando dados",
+  pensando: "buscando dados...",
   feliz: "tudo certo",
   triste: "algo falhou",
   "": "pronto"
@@ -764,14 +793,84 @@ function humorRobo(estado, detalhe) {
     r.classList.remove("pensando", "feliz", "triste");
     if (estado) r.classList.add(estado);
   });
-  const fala = $("#roboFala");
-  if (fala) fala.textContent = detalhe || FALA_ROBO[estado || ""];
+  const balao = $("#balao");
+  if (balao) {
+    balao.textContent = detalhe || FALA_ROBO[estado || ""];
+    balao.classList.toggle("bom", estado === "feliz");
+    balao.classList.toggle("alerta", estado === "triste");
+  }
   if (estado === "feliz" || estado === "triste") {
     voltaRobo = setTimeout(() => {
       robos.forEach(r => r.classList.remove("feliz", "triste"));
-      if (fala) fala.textContent = FALA_ROBO[""];
-    }, 3000);
+      if (balao) {
+        balao.textContent = FALA_ROBO[""];
+        balao.classList.remove("bom", "alerta");
+      }
+    }, 3200);
   }
+}
+
+/* ------------------------------------------------- voz do robo
+   Usa a sintese de fala do proprio navegador, que aproveita as vozes
+   instaladas no sistema. Nao baixa nada e funciona sem internet.
+   Vem desligada: voz que fala sem ser chamada irrita mais do que ajuda. */
+const voz = { ligada: false, escolhida: null, disponivel: "speechSynthesis" in window };
+
+function escolheVoz() {
+  if (!voz.disponivel) return;
+  const todas = speechSynthesis.getVoices();
+  if (!todas.length) return;          // a lista chega depois, via evento
+  voz.escolhida = todas.find(v => v.lang === "pt-BR")
+    || todas.find(v => v.lang && v.lang.startsWith("pt"))
+    || null;
+}
+if (voz.disponivel) {
+  escolheVoz();
+  speechSynthesis.addEventListener("voiceschanged", escolheVoz);
+}
+
+function dizer(texto) {
+  if (!voz.ligada || !voz.disponivel || !texto) return;
+  // corta o que estava falando: o aviso novo importa mais que o antigo
+  speechSynthesis.cancel();
+  const f = new SpeechSynthesisUtterance(texto);
+  f.lang = "pt-BR";
+  if (voz.escolhida) f.voice = voz.escolhida;
+  f.rate = 1.05;
+  f.pitch = 1.1;
+  const g = $("#roboG");
+  f.onstart = () => { if (g) g.classList.add("falando"); };
+  f.onend = () => { if (g) g.classList.remove("falando"); };
+  f.onerror = () => { if (g) g.classList.remove("falando"); };
+  speechSynthesis.speak(f);
+}
+
+function pintaBotaoVoz() {
+  const b = $("#btVoz");
+  if (!b) return;
+  if (!voz.disponivel) {
+    b.textContent = "voz indisponivel";
+    b.disabled = true;
+    return;
+  }
+  b.textContent = voz.ligada ? "voz ligada" : "voz desligada";
+  b.classList.toggle("ligada", voz.ligada);
+}
+
+// Monta a frase do regime a partir do que o painel calculou. So fatos:
+// regime, posicao em relacao a inversao e alertas de nivel colado.
+function frasePara(d) {
+  if (!d || d.erro || !d.leitura) return "";
+  const L = d.leitura;
+  const dec = d.spot > 2000 ? 0 : 2;
+  const partes = ["Gama " + (L.regime === "POSITIVO" ? "positivo" : "negativo")
+                  + " no " + d.indice + "."];
+  if (d.zero_gamma) {
+    partes.push("Preco " + (d.spot < d.zero_gamma ? "abaixo" : "acima")
+                + " da inversao, em " + num(d.zero_gamma, dec) + ".");
+  }
+  if (L.alertas && L.alertas.length) partes.push("Atencao: " + L.alertas[0]);
+  return partes.join(" ");
 }
 
 // piscada curta para o olho perceber que o valor mudou
@@ -1241,7 +1340,23 @@ async function atualizarTudo() {
   $("#status").textContent = "atualizado as "
     + new Date().toLocaleTimeString("pt-BR") + "  (" + seg + "s"
     + (falhas ? ", " + falhas + " com falha" : "") + ")";
-  humorRobo(falhas ? "triste" : "feliz");
+
+  // o robo resume o resultado no balao e, se a voz estiver ligada, fala
+  const ndx = estado.gamma.NDX;
+  const frase = frasePara(ndx);
+  if (falhas) {
+    humorRobo("triste", falhas + " de " + passos.length + " etapas falharam");
+    dizer("Atencao: " + falhas + " etapas falharam na atualizacao.");
+  } else if (frase) {
+    const L = ndx.leitura;
+    humorRobo(L.alertas && L.alertas.length ? "triste" : "feliz",
+              L.titulo + (L.alertas && L.alertas.length
+                          ? " - " + L.alertas[0] : ""));
+    dizer(frase);
+  } else {
+    humorRobo("feliz");
+    dizer("Atualizacao concluida.");
+  }
   bt.disabled = false;
 }
 
@@ -1322,6 +1437,8 @@ async function gerarECopiar(ativo, botao) {
         + ", base " + (i.base === "indice" ? "indice" : "futuro")
         + " - cole no indicador";
       piscar(estadoTxt);
+      humorRobo("feliz", "niveis do " + i.ativo + " copiados");
+      dizer("Niveis do " + i.ativo + " copiados.");
     }
   } catch (e) {
     estadoTxt.textContent = "falhou: " + e.message;
@@ -1368,6 +1485,18 @@ $("#btBase").addEventListener("click", () => {
 });
 
 $("#btVer").addEventListener("click", () => exportar(ativoFoco(), plataformaAtual()));
+
+$("#btVoz").addEventListener("click", () => {
+  voz.ligada = !voz.ligada;
+  pintaBotaoVoz();
+  if (voz.ligada) {
+    escolheVoz();
+    dizer("Voz ligada.");
+  } else {
+    speechSynthesis.cancel();
+  }
+});
+pintaBotaoVoz();
 $("#btCopiar").addEventListener("click", () => {
   navigator.clipboard.writeText($("#saidaExport").textContent);
   $("#btCopiar").textContent = "copiado!";
