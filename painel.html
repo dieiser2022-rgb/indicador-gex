@@ -9,7 +9,8 @@
   --fundo: #0b1120; --painel: #111c33; --borda: #1e293b;
   --texto: #e2e8f0; --apagado: #94a3b8;
   --alta: #22c55e; --baixa: #ef4444;
-  --call_wall: #f87171; --put_wall: #4ade80; --inversao: #fbbf24;
+  /* call verde, put vermelho: a cor segue o lado da aposta */
+  --call_wall: #4ade80; --put_wall: #f87171; --inversao: #fbbf24;
   --destaque: #38bdf8; --botao: #2563eb;
 }
 * { box-sizing: border-box; }
@@ -867,13 +868,11 @@ $("#btSalvarCores").addEventListener("click", async () => {
   $("#modalCores").classList.remove("on");
 });
 $("#btResetCores").addEventListener("click", async () => {
+  // quem sabe as cores padrao e o servidor; aqui so pedimos o reset, para
+  // nao manter uma segunda copia da paleta que poderia ficar desatualizada
   await fetch("/api/config", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cores: {
-      fundo: "#0b1120", painel: "#111c33", borda: "#1e293b",
-      texto: "#e2e8f0", apagado: "#94a3b8", alta: "#22c55e", baixa: "#ef4444",
-      call_wall: "#f87171", put_wall: "#4ade80", inversao: "#fbbf24",
-      destaque: "#38bdf8", botao: "#2563eb" } })
+    body: JSON.stringify({ reset_cores: true })
   });
   location.reload();
 });

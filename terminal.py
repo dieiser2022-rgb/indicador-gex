@@ -39,8 +39,10 @@ CORES_PADRAO = {
     "apagado": "#94a3b8",
     "alta": "#22c55e",
     "baixa": "#ef4444",
-    "call_wall": "#f87171",
-    "put_wall": "#4ade80",
+    # call verde e put vermelho: segue o lado da aposta, nao o papel de
+    # suporte ou resistencia
+    "call_wall": "#4ade80",
+    "put_wall": "#f87171",
     "inversao": "#fbbf24",
     "destaque": "#38bdf8",
     "botao": "#2563eb",
@@ -76,6 +78,10 @@ TRAVA = threading.Lock()
 
 # ------------------------------------------------------------------- config
 
+    # cores usadas antes da troca: call vermelho e put verde
+CORES_ANTIGAS = {"call_wall": "#f87171", "put_wall": "#4ade80"}
+
+
 def ler_config():
     cfg = {"cores": dict(CORES_PADRAO), "dias_max": 45, "grafico": GRAFICO_PADRAO}
     if os.path.exists(CONFIG):
@@ -88,11 +94,22 @@ def ler_config():
                     cfg[chave] = salvo[chave]
         except Exception:
             pass
+
+    # Quem salvou as cores antes da troca tem call vermelho e put verde
+    # gravado em disco, o que sobrescreveria o padrao novo. Se o arquivo tem
+    # exatamente aquelas duas cores, troca. Cores escolhidas a mao nao mudam.
+    if all(cfg["cores"].get(k, "").lower() == v
+           for k, v in CORES_ANTIGAS.items()):
+        cfg["cores"]["call_wall"] = CORES_PADRAO["call_wall"]
+        cfg["cores"]["put_wall"] = CORES_PADRAO["put_wall"]
+
     return cfg
 
 
 def gravar_config(novo):
     cfg = ler_config()
+    if novo.get("reset_cores"):
+        cfg["cores"] = dict(CORES_PADRAO)
     if isinstance(novo.get("cores"), dict):
         cfg["cores"].update({k: v for k, v in novo["cores"].items()
                              if k in CORES_PADRAO})
