@@ -1,0 +1,153 @@
+//@version=5
+// =============================================================================
+//  GEX - Niveis de Gamma
+//
+//  Cole no campo "Cole os dados aqui" a linha gerada pelo terminal
+//  (botao TradingView na caixa "Gerar GEX").
+//
+//  Formato aceito:
+//    $NQ1!: Call Resistance, 30100, Put Support, 30000, HVL, 30075, ...
+//
+//  O prefixo do ticker e opcional e a ordem dos campos nao importa: o script
+//  procura cada nome pelo nome, entao campo que faltar e apenas ignorado.
+// =============================================================================
+indicator("GEX - Niveis de Gamma", shorttitle = "GEX", overlay = true,
+          max_lines_count = 80, max_labels_count = 80)
+
+// ----------------------------------------------------------------- entrada
+g_dados = "Dados"
+dados = input.text_area(defval = "", title = "Cole os dados aqui",
+                        group = g_dados)
+
+g_ver = "O que mostrar"
+ver_paredes = input.bool(true, "Paredes de call e put",       group = g_ver)
+ver_hvl     = input.bool(true, "Inversao gama (HVL)",         group = g_ver)
+ver_0dte    = input.bool(true, "Niveis 0DTE",                 group = g_ver)
+ver_faixa   = input.bool(true, "Faixa do dia (1D Min e Max)", group = g_ver)
+ver_gex     = input.bool(true, "GEX por strike",              group = g_ver)
+qtd_gex     = input.int(10, "Quantos GEX mostrar", minval = 1, maxval = 10,
+                        group = g_ver)
+
+g_cor = "Cores"
+cor_call  = input.color(#4ade80, "Parede de call",  group = g_cor)
+cor_put   = input.color(#f87171, "Parede de put",   group = g_cor)
+cor_hvl   = input.color(#fbbf24, "Inversao gama",   group = g_cor)
+cor_0dte  = input.color(#c084fc, "Gamma wall 0DTE", group = g_cor)
+cor_gex   = input.color(#38bdf8, "GEX por strike",  group = g_cor)
+cor_faixa = input.color(#94a3b8, "Faixa do dia",    group = g_cor)
+
+g_est = "Estilo"
+comprimento  = input.int(150, "Comprimento da linha (barras)", minval = 5,
+                         group = g_est)
+espessura    = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_est)
+tam_texto    = input.string("small", "Tamanho do texto",
+                            options = ["tiny", "small", "normal"], group = g_est)
+ver_preco    = input.bool(true, "Mostrar o preco no rotulo", group = g_est)
+transparencia = input.int(88, "Transparencia do rotulo", minval = 0,
+                          maxval = 100, group = g_est)
+
+// --------------------------------------------------------------- auxiliares
+// Normaliza para comparar: maiusculas e sem espacos. Resolve de uma vez o
+// espaco que vem depois da virgula, ja que nem toda versao do Pine tem trim.
+norm(s) =>
+    str.replace_all(str.upper(s), " ", "")
+
+tamanho_texto() =>
+    tam_texto == "tiny" ? size.tiny : tam_texto == "normal" ? size.normal : size.small
+
+// pares nome/valor lidos do texto colado
+var nomes   = array.new_string()
+var valores = array.new_float()
+
+// desenhos da passada anterior, guardados para poder apagar
+var linhas  = array.new_line()
+var rotulos = array.new_label()
+
+apagar_tudo() =>
+    if array.size(linhas) > 0
+        for i = 0 to array.size(linhas) - 1
+            line.delete(array.get(linhas, i))
+        array.clear(linhas)
+    if array.size(rotulos) > 0
+        for i = 0 to array.size(rotulos) - 1
+            label.delete(array.get(rotulos, i))
+        array.clear(rotulos)
+
+buscar(chave) =>
+    achado = float(na)
+    if array.size(nomes) > 0
+        for i = 0 to array.size(nomes) - 1
+            if array.get(nomes, i) == chave
+                achado := array.get(valores, i)
+    achado
+
+marcar(preco, texto, cor, estilo) =>
+    if not na(preco) and preco > 0
+        linha = line.new(bar_index - comprimento, preco, bar_index, preco,
+                         extend = extend.right, color = cor, style = estilo,
+                         width = espessura)
+        array.push(linhas, linha)
+        escrito = ver_preco ? texto + "   " + str.tostring(preco, format.mintick)
+                            : texto
+        etiqueta = label.new(bar_index + 3, preco, escrito,
+                             style = label.style_label_left,
+                             color = color.new(cor, transparencia),
+                             textcolor = cor, size = tamanho_texto())
+        array.push(rotulos, etiqueta)
+
+// ------------------------------------------------------------------ desenho
+if barstate.islast
+    apagar_tudo()
+    array.clear(nomes)
+    array.clear(valores)
+
+    if str.length(dados) > 2
+        // Tira o prefixo do ticker, se vier. Usa split em vez de procurar a
+        // posicao do caractere, que nem toda versao do Pine oferece.
+        texto = dados
+        if str.contains(texto, ":")
+            pedacos = str.split(texto, ":")
+            texto := array.get(pedacos, array.size(pedacos) - 1)
+
+        // Varre os pedacos separados por virgula. Quando o pedaco e numero,
+        // ele vale para o nome que veio antes. Assim a leitura nao depende da
+        // posicao: se faltar um campo, os outros continuam corretos.
+        partes = str.split(texto, ",")
+        if array.size(partes) > 0
+            pendente = ""
+            for i = 0 to array.size(partes) - 1
+                item = array.get(partes, i)
+                valor = str.tonumber(str.replace_all(item, " ", ""))
+                if na(valor)
+                    pendente := norm(item)
+                else if str.length(pendente) > 0
+                    array.push(nomes, pendente)
+                    array.push(valores, valor)
+                    pendente := ""
+
+        if ver_paredes
+            marcar(buscar("CALLRESISTANCE"), "Call Resistance", cor_call,
+                   line.style_solid)
+            marcar(buscar("PUTSUPPORT"), "Put Support", cor_put,
+                   line.style_solid)
+
+        if ver_hvl
+            marcar(buscar("HVL"), "HVL", cor_hvl, line.style_dashed)
+
+        if ver_0dte
+            marcar(buscar("CALLRESISTANCE0DTE"), "Call Resist 0DTE", cor_call,
+                   line.style_dotted)
+            marcar(buscar("PUTSUPPORT0DTE"), "Put Support 0DTE", cor_put,
+                   line.style_dotted)
+            marcar(buscar("HVL0DTE"), "HVL 0DTE", cor_hvl, line.style_dotted)
+            marcar(buscar("GAMMAWALL0DTE"), "Gamma Wall 0DTE", cor_0dte,
+                   line.style_solid)
+
+        if ver_faixa
+            marcar(buscar("1DMIN"), "1D Min", cor_faixa, line.style_dotted)
+            marcar(buscar("1DMAX"), "1D Max", cor_faixa, line.style_dotted)
+
+        if ver_gex
+            for i = 1 to qtd_gex
+                marcar(buscar("GEX" + str.tostring(i)),
+                       "GEX " + str.tostring(i), cor_gex, line.style_dotted)
