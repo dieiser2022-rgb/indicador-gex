@@ -76,9 +76,11 @@ transp_linha = input.int(0, "Transparencia da linha", minval = 0, maxval = 100, 
 
 // ------------------------------------------------------------ rotulos, geral
 g_ro = "Rotulos (geral)"
-lado_rotulo = input.string("Direita", "Posicao", options = ["Direita", "Esquerda"], group = g_ro)
+lado_rotulo = input.string("Direita", "Posicao horizontal", options = ["Direita", "Esquerda"], group = g_ro)
+altura_rotulo = input.string("Acima da linha", "Posicao vertical", options = ["Acima da linha", "No meio da linha", "Abaixo da linha"], group = g_ro)
 forma_rotulo = input.string("Etiqueta", "Forma", options = ["Etiqueta", "Somente texto"], group = g_ro)
 afastamento = input.int(3, "Afastamento do rotulo (barras)", minval = 0, group = g_ro)
+desloca_ticks = input.int(6, "Deslocamento vertical (ticks)", minval = 0, group = g_ro)
 tam_texto = input.string("small", "Tamanho do texto", options = ["tiny", "small", "normal", "large"], group = g_ro)
 ver_preco = input.bool(true, "Mostrar o preco junto do nome", group = g_ro)
 cor_texto_fixa = input.bool(false, "Usar uma cor unica para todo texto", group = g_ro)
@@ -106,8 +108,24 @@ tamanho_texto() =>
 extensao_de() =>
     extensao == "Direita" ? extend.right : extensao == "Ambos os lados" ? extend.both : extend.none
 
+// Forma do rotulo. Quando ele fica acima ou abaixo da linha, o estilo da
+// etiqueta muda para a seta apontar na direcao certa.
 forma_de() =>
-    forma_rotulo == "Somente texto" ? label.style_none : lado_rotulo == "Direita" ? label.style_label_left : label.style_label_right
+    resultado = label.style_none
+    if forma_rotulo != "Somente texto"
+        if altura_rotulo == "Acima da linha"
+            resultado := label.style_label_down
+        else if altura_rotulo == "Abaixo da linha"
+            resultado := label.style_label_up
+        else
+            resultado := lado_rotulo == "Direita" ? label.style_label_left : label.style_label_right
+    resultado
+
+// Altura do texto. Com etiqueta, o proprio estilo ja desloca; com texto puro
+// e preciso empurrar o preco alguns ticks para nao escrever sobre a linha.
+altura_de(preco) =>
+    passo = syminfo.mintick * desloca_ticks
+    altura_rotulo == "Acima da linha" ? preco + (forma_rotulo == "Somente texto" ? passo : 0) : altura_rotulo == "Abaixo da linha" ? preco - (forma_rotulo == "Somente texto" ? passo : 0) : preco
 
 // pares nome/valor lidos do texto colado
 var nomes = array.new_string()
@@ -149,7 +167,7 @@ marcar(preco, texto, cor, estilo, espessura, com_rotulo) =>
             onde = lado_rotulo == "Direita" ? bar_index + avanco + afastamento : bar_index - comprimento - afastamento
             fundo = forma_rotulo == "Somente texto" ? color.new(color.black, 100) : color.new(cor, transparencia)
             tinta = cor_texto_fixa ? cor_texto : cor
-            etiqueta = label.new(onde, preco, escrito, style = forma_de(), color = fundo, textcolor = tinta, size = tamanho_texto())
+            etiqueta = label.new(onde, altura_de(preco), escrito, style = forma_de(), color = fundo, textcolor = tinta, size = tamanho_texto())
             array.push(rotulos, etiqueta)
 
 // aviso de estado, para o indicador nunca ficar invisivel sem explicacao

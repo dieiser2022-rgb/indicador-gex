@@ -45,6 +45,52 @@ def faixa_do_dia(spot, iv):
     return spot - passo, spot + passo
 
 
+SEPARACAO_MINIMA = 0.0025   # 0,25% do preco entre um GEX e outro
+QUANTOS_GEX = 10
+
+
+def escolher_gex(spot, por_strike, evitar=(), quantos=QUANTOS_GEX,
+                 separacao=SEPARACAO_MINIMA):
+    """Escolhe os strikes de maior concentracao, mas espalhados.
+
+    Pegar simplesmente os dez maiores nao serve: o gamma e sempre mais alto
+    perto do dinheiro, entao os dez maiores sao sempre os dez vizinhos do
+    preco, e no grafico viram um amontoado de linhas coladas.
+
+    Aqui os candidatos continuam ordenados por tamanho, mas um strike so entra
+    se estiver a uma distancia minima dos que ja entraram e dos niveis que o
+    formato ja publica em campo proprio (as paredes e a inversao). O resultado
+    e um perfil legivel em vez de um bloco.
+    """
+    if not por_strike or not spot:
+        return []
+    minimo = spot * separacao
+    escolhidos = []
+    bloqueados = [v for v in evitar if v]
+
+    candidatos = sorted(por_strike.items(), key=lambda kv: abs(kv[1]),
+                        reverse=True)
+    for strike, _ in candidatos:
+        if len(escolhidos) >= quantos:
+            break
+        perto_de_outro = any(abs(strike - j) < minimo
+                             for j in escolhidos + bloqueados)
+        if perto_de_outro:
+            continue
+        escolhidos.append(strike)
+
+    # Se a separacao foi exigente demais e sobrou pouco, completa com os
+    # maiores que ainda nao entraram, para nao devolver meia lista.
+    if len(escolhidos) < quantos:
+        for strike, _ in candidatos:
+            if len(escolhidos) >= quantos:
+                break
+            if strike not in escolhidos and strike not in bloqueados:
+                escolhidos.append(strike)
+
+    return escolhidos
+
+
 def _niveis_de(G, spot, contratos, com_zero_gamma=True):
     """Calcula paredes, inversao e perfil para um conjunto de contratos."""
     if not contratos:
@@ -86,9 +132,12 @@ def calcular(G, dados_cboe, dias_padrao=45, dias_0dte=0):
 
     mn, mx = faixa_do_dia(spot, iv)
 
-    # os dez strikes de maior concentracao, do maior para o menor
-    perfil = sorted((padrao or {}).get("por_strike", {}).items(),
-                    key=lambda kv: abs(kv[1]), reverse=True)[:10]
+    ja_usados = []
+    for chave in ("call_wall", "put_wall", "zero_gamma"):
+        v = (padrao or {}).get(chave)
+        if v:
+            ja_usados.append(v)
+    perfil = escolher_gex(spot, (padrao or {}).get("por_strike", {}), ja_usados)
 
     return {
         "spot": spot,
@@ -100,7 +149,7 @@ def calcular(G, dados_cboe, dias_padrao=45, dias_0dte=0):
         "hoje": hoje,
         "min_dia": mn,
         "max_dia": mx,
-        "gex_top": [k for k, _ in perfil],
+        "gex_top": perfil,
     }
 
 
@@ -145,4 +194,7 @@ def montar(ticker, calc, basis=0.0, fator=1.0):
         partes.append(campo + ", " + numero(v))
 
     linha = (nome + ": " if nome else "") + ", ".join(partes)
-    return linha, valores
+    # devolve so o que entrou na linha, para a tabela de conferencia do painel
+    # nao exibir campo vazio
+    presentes = {k: v for k, v in valores.items() if v is not None}
+    return linha, presentes
