@@ -268,16 +268,41 @@ button:disabled { background: #334155; cursor: wait; filter: none;
 .topo .ag { width: 290px; flex: none; }
 .topo .rg { width: 200px; flex: none; }
 .topo .dc { flex: 1; min-width: 0; }
-.topo .jr { width: 270px; flex: none; }
-.topo .rb { width: 210px; flex: none; }
-.topo .ex { width: 268px; flex: none; }
+.topo .rl { width: 196px; flex: none; }
+.topo .jr { width: 258px; flex: none; }
+.topo .rb { width: 196px; flex: none; }
+.topo .ex { width: 262px; flex: none; }
 @media (max-width: 1250px) {
   .grade { grid-template-columns: 1fr;
     grid-template-areas: "topo" "grafico" "manha" "news"; }
   .topo { flex-wrap: wrap; }
-  .topo .ag, .topo .rg, .topo .dc, .topo .jr, .topo .rb,
+  .topo .ag, .topo .rg, .topo .dc, .topo .rl, .topo .jr, .topo .rb,
   .topo .ex { width: 100%; }
 }
+
+/* ---------- relogio e sessoes de mercado ---------- */
+.rlHoras { display: flex; gap: 8px; margin-bottom: 9px; }
+.rlBloco { flex: 1; min-width: 0; }
+.rlBloco span { display: block; font-family: var(--mono); font-size: 17px;
+                font-weight: 700; letter-spacing: -.5px; line-height: 1.1; }
+.rlBloco i { display: block; color: var(--apagado); font-size: 8.5px;
+             letter-spacing: .8px; text-transform: uppercase;
+             font-style: normal; margin-top: 1px; }
+.ses { margin-bottom: 5px; }
+.sesTopo { display: flex; justify-content: space-between; gap: 5px;
+           font-size: 9.5px; margin-bottom: 2px; }
+.sesTopo b { font-weight: 600; letter-spacing: .3px; }
+.sesTopo span { color: var(--apagado); font-family: var(--mono);
+                font-size: 9px; }
+.sesBarra { height: 4px; border-radius: 3px; background: var(--borda);
+            overflow: hidden; }
+.sesBarra i { display: block; height: 100%; border-radius: 3px;
+              background: var(--apagado); transition: width .5s; }
+.ses.aberta .sesTopo b { color: var(--alta); }
+.ses.aberta .sesBarra i { background: var(--alta);
+                          box-shadow: 0 0 8px var(--alta); }
+/* tela cheia: o painel ja ocupa a altura toda, entao basta tirar a sobra */
+:fullscreen .grade { padding: 10px 12px; }
 
 /* ---------- juros de 10 anos ---------- */
 .jr { display: flex; flex-direction: column; }
@@ -561,6 +586,8 @@ table.cal tr:hover { background: rgba(148,163,184,.05); }
   <button id="atualizar">ATUALIZAR REGIOES</button>
   <button class="fantasma" id="btNiveis">niveis</button>
   <button class="fantasma" id="btCores">cores</button>
+  <button class="fantasma" id="btTela" title="tela cheia (F11 tambem funciona)">
+    tela cheia</button>
   <span id="status">clique em atualizar</span>
 </header>
 
@@ -584,6 +611,21 @@ table.cal tr:hover { background: rgba(148,163,184,.05); }
     <div class="caixa dc">
       <h2>3 &middot; Como o market maker tende a agir</h2>
       <div id="dica"><span class="vazio">aguardando...</span></div>
+    </div>
+
+    <div class="caixa rl">
+      <h2>Relogio</h2>
+      <div class="rlHoras">
+        <div class="rlBloco">
+          <span id="rlAqui">--:--:--</span>
+          <i id="rlAquiFuso">aqui</i>
+        </div>
+        <div class="rlBloco">
+          <span id="rlNY">--:--:--</span>
+          <i>Nova York</i>
+        </div>
+      </div>
+      <div id="sessoes"></div>
     </div>
 
     <div class="caixa jr">
@@ -1125,6 +1167,97 @@ function getCor(nome) {
   return getComputedStyle(document.documentElement)
     .getPropertyValue("--" + nome).trim() || "#888";
 }
+
+/* ---------------------------------------------------- relogio e sessoes
+   Os horarios de cada praca sao calculados no fuso dela, usando o proprio
+   navegador para a conversao. Assim nao e preciso tratar horario de verao a
+   mao: quando os Estados Unidos mudam e o Brasil nao, a conta acompanha. */
+const PRACAS = [
+  { nome: "Nova York", fuso: "America/New_York", abre: 9.5,  fecha: 16 },
+  { nome: "Sao Paulo", fuso: "America/Sao_Paulo", abre: 10,  fecha: 17 },
+  { nome: "Londres",   fuso: "Europe/London",     abre: 8,   fecha: 16.5 },
+  { nome: "Frankfurt", fuso: "Europe/Berlin",     abre: 9,   fecha: 17.5 },
+  { nome: "Toquio",    fuso: "Asia/Tokyo",        abre: 9,   fecha: 15 },
+];
+
+function horaNoFuso(fuso) {
+  const agora = new Date();
+  const txt = agora.toLocaleString("en-US", { timeZone: fuso, hour12: false,
+    hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "short" });
+  // vem como "Mon, 14:32:07"
+  const partes = txt.split(", ");
+  const dia = partes[0];
+  const [h, m, s] = partes[partes.length - 1].split(":").map(Number);
+  return { dia: dia, h: h % 24, m: m, s: s, decimal: (h % 24) + m / 60 + s / 3600 };
+}
+
+function relogioTexto(fuso) {
+  return new Date().toLocaleTimeString("pt-BR", { timeZone: fuso,
+    hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function faltaPara(horas) {
+  const total = Math.round(horas * 60);
+  const h = Math.floor(total / 60), m = total % 60;
+  return h > 0 ? h + "h" + String(m).padStart(2, "0") : m + "min";
+}
+
+function mostraSessoes() {
+  const alvo = $("#sessoes");
+  if (!alvo) return;
+  let html = "";
+  PRACAS.forEach(p => {
+    const t = horaNoFuso(p.fuso);
+    const fimDeSemana = t.dia === "Sat" || t.dia === "Sun";
+    const aberta = !fimDeSemana && t.decimal >= p.abre && t.decimal < p.fecha;
+    let feito = 0, nota = "";
+    if (fimDeSemana) {
+      nota = "fim de semana";
+    } else if (aberta) {
+      feito = (t.decimal - p.abre) / (p.fecha - p.abre) * 100;
+      nota = "fecha em " + faltaPara(p.fecha - t.decimal);
+    } else if (t.decimal < p.abre) {
+      nota = "abre em " + faltaPara(p.abre - t.decimal);
+    } else {
+      nota = "fechou";
+    }
+    html += '<div class="ses' + (aberta ? " aberta" : "") + '">'
+      + '<div class="sesTopo"><b>' + p.nome + "</b><span>" + nota
+      + "</span></div>"
+      + '<div class="sesBarra"><i style="width:' + feito.toFixed(0)
+      + '%"></i></div></div>';
+  });
+  alvo.innerHTML = html;
+}
+
+function tiqueRelogio() {
+  const aqui = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  $("#rlAqui").textContent = relogioTexto(aqui);
+  $("#rlNY").textContent = relogioTexto("America/New_York");
+  const curto = (aqui || "").split("/").pop().replace(/_/g, " ");
+  $("#rlAquiFuso").textContent = curto || "aqui";
+  mostraSessoes();
+}
+tiqueRelogio();
+setInterval(tiqueRelogio, 1000);
+
+/* ---------------------------------------------------- tela cheia */
+$("#btTela").addEventListener("click", () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen().catch(() => { });
+  }
+});
+document.addEventListener("fullscreenchange", () => {
+  const cheia = !!document.fullscreenElement;
+  $("#btTela").textContent = cheia ? "sair da tela cheia" : "tela cheia";
+  // o grafico desenha no tamanho real, entao precisa refazer
+  setTimeout(() => {
+    if (estado.grafico) desenhaGrafico(estado.grafico);
+    if (estado.juros) desenhaJuros(estado.juros);
+  }, 150);
+});
 
 /* ---------------------------------------------------- juros 10 anos */
 function desenhaJuros(d) {
