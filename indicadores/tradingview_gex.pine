@@ -27,7 +27,7 @@ ver_paredes = input.bool(true, "Paredes de call e put", group = g_ver)
 ver_hvl = input.bool(true, "Inversao gama (HVL)", group = g_ver)
 ver_0dte = input.bool(true, "Niveis 0DTE", group = g_ver)
 ver_faixa = input.bool(true, "Faixa do dia (1D Min e Max)", group = g_ver)
-ver_gex = input.bool(true, "GEX por strike", group = g_ver)
+ver_gex = input.bool(false, "GEX por strike", group = g_ver)
 qtd_gex = input.int(10, "Quantos GEX mostrar", minval = 1, maxval = 10, group = g_ver)
 
 // ----------------------------------------------------- estilo por tipo de nivel
