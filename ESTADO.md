@@ -1,110 +1,99 @@
-# Terminal GEX — onde paramos
+# Terminal GEX — estado do projeto
 
-## Funcionando hoje
-
-Arquivos na máquina do usuário, em `C:\gex`:
+## Arquivos
 
 | Arquivo | O que faz |
 |---|---|
-| `gamma_cboe.py` | baixa a CBOE, calcula Net GEX, Zero Gamma, Call/Put Wall, grava `gamma.csv` |
-| `terminal.py` | servidor local em `localhost:8777`, cards dos 4 ativos + botão atualizar |
-| `agendador.py` | coleta a cada 15 min só em horário de mercado (feito, nunca rodou de verdade) |
-| `testar_candles.py` | descobriu as fontes de candles |
+| `terminal.py` | servidor local em `localhost:8777` e todas as rotas da API |
+| `painel.html` | interface: as 9 áreas do layout desenhado pelo usuário |
+| `gamma_cboe.py` | baixa a CBOE e calcula os níveis; roda sozinho pelo terminal de texto |
+| `fontes.py` | candles, cotações, calendário econômico e notícias |
+| `leitura.py` | texto do market maker e morning call, por regras |
+| `agendador.py` | coleta a cada 15 min dentro do horário de mercado |
+| `testar_candles.py` | verifica quais fontes de candles respondem |
+| `config.json` | cores e preferências (criado no primeiro uso) |
+| `legado/` | primeiras tentativas, raspando um site de terceiros (abandonado) |
 
-Rodar: `cd C:\gex` e `python terminal.py`. Nada para instalar — só biblioteca padrão.
+## As 9 áreas do desenho
 
-## Fontes de dados confirmadas na máquina dele
+| # | Parte | Situação |
+|---|---|---|
+| 1 | Agenda econômica: 3 antes, 3 depois, botão para a semana inteira | feito |
+| 2 | Regime de gamma em destaque grande | feito |
+| 3 | Texto de como o market maker tende a agir | feito |
+| 4 | Gráfico de candles com os níveis plotados | feito |
+| 5 | Perfil de gamma na lateral do gráfico | feito |
+| 6 | Notícias, clicáveis, com resumo que expande | feito |
+| 7 | Morning call factual | feito |
+| 8 | Cards de NDX/SPX/QQQ/SPY + NQ/ES | feito |
+| 9 | Botões MT5 / TradingView / NinjaTrader | **só layout** — mostram os níveis em texto |
+| + | Editor de cores, salvo em `config.json` | feito |
+| + | Seletor de vencimento (0DTE / semana / mês / 45 dias) | feito |
+
+## Fontes de dados
 
 - **CBOE** `https://cdn.cboe.com/api/global/delayed_quotes/options/{SIMBOLO}.json`
   (índices com underscore: `_SPX`, `_NDX`). Traz `current_price`, `gamma`,
-  `open_interest`, `iv`. Atraso ~15 min, sem chave. SPX tem 29 mil contratos.
-- **Yahoo** `https://query1.finance.yahoo.com/v8/finance/chart/{SIMBOLO}?interval=15m&range=1mo`
-  Funcionou para `NQ=F`, `ES=F`, `^NDX`, `^SPX`, `QQQ`. NQ=F devolveu 2485 candles
-  de 15m. O endpoint **v7 de opções dá 401** — só o v8 de chart serve.
+  `open_interest`, `iv`. Atraso ~15 min, sem chave.
+- **Yahoo** `.../v8/finance/chart/{SIMBOLO}?interval=15m&range=5d`
+  Confirmado para `NQ=F`, `ES=F`, `^NDX`, `^SPX`, `QQQ`. O endpoint **v7 de
+  opções dá 401** — só o v8 de chart serve.
+- **Calendário** `https://nfs.faireconomy.media/ff_calendar_thisweek.json`
+  (cai para `.xml`). Traz horário, moeda, impacto, previsão e anterior.
+  É um feed informal e pode sair do ar — nesse caso a área fica vazia, sem
+  derrubar o resto. Reserva oficial possível: Federal Reserve e BLS, que não
+  têm o campo de previsão.
+- **Notícias** RSS de MarketWatch, Yahoo Finance, CNBC e Investing.
 - **Stooq**: não funciona, devolve página anti-robô.
-- Strike não vem como campo: está no nome do contrato (padrão OSI).
+
+Nada exige chave ou cadastro. Todas as funções de `fontes.py` devolvem vazio
+em caso de falha, em vez de levantar exceção.
+
+## Decisões de cálculo
+
+- Strike não vem como campo: está no nome do contrato, padrão OSI.
   `SPY261023C00500000` = SPY + 261023 + C + strike×1000.
+- `MARGEM = 0` no terminal, para a parede bater com a convenção dos sites de
+  referência (eles aceitam parede colada no preço).
+- Contratos já vencidos são descartados: o gamma de uma opção no dia do
+  vencimento distorce o total. Foi o que inflou a primeira medição.
+- Contratos sem IV herdam a IV mediana.
+- Sem gamma da CBOE, calcula por Black-Scholes usando só `math`.
+- A inversão gama vem de varredura: simula 51 preços, recalcula o gamma da
+  carteira em cada um e acha onde troca de sinal. Somar strikes não funciona
+  quando todos têm o mesmo sinal — foi o que dava `N/A` antes.
 
-### Ainda não testadas (entram num testador quando chegar a hora)
+## Níveis de outros ativos no gráfico
 
-- Calendário: `https://nfs.faireconomy.media/ff_calendar_thisweek.xml`
-  (feed semanal público do ForexFactory: horário, moeda, impacto, evento,
-  previsão, anterior). É informal e pode cair sem aviso — reserva oficial:
-  Federal Reserve (FOMC), BLS (CPI/payroll), que não têm campo de previsão.
-- Notícias: RSS do MarketWatch e do Yahoo Finance (livres para uso pessoal).
+O gráfico mostra o índice principal com conversão **exata** (basta somar o
+basis) e o ETF do mesmo mercado por **proporção** (`spot_base / spot_outro`),
+que é aproximado e aparece tracejado na tela.
+
+Plota apenas o par natural — NDX+QQQ no gráfico do Nasdaq, SPX+SPY no do S&P.
+Jogar os quatro ativos daria 12 linhas e viraria uma zebra ilegível.
 
 ## Validação contra o site de referência (23/10/2026)
 
 Spot, inversão gama e parede de call bateram quase exatos nos 4 ativos.
-Net GEX do SPX: nosso −51,14B contra −50,98B do site (0,3%).
-Basis automático: ES = SPX + 48,82 / NQ = NDX + 217,47 — bateu com o site.
+Net GEX do SPX: nosso −51,14B contra −50,98B (0,3%).
+Basis automático: ES = SPX + 48,82 e NQ = NDX + 217,47 — coincidiu.
 
-## O terminal que o usuário desenhou (escopo acordado)
+## Pendências
 
-| # | Parte | Situação |
-|---|---|---|
-| 1 | Calendário econômico do dia: 3 eventos antes, 3 depois, botão para o completo | dá |
-| 2 | Regime de gamma (positivo/negativo) em destaque grande | dá, já calculado |
-| 3 | Texto de como o market maker tende a se comportar | dá, por regras |
-| 4 | Gráfico de candles 15m com os níveis plotados (vários ativos juntos) | dá |
-| 5 | Perfil de gamma vertical na lateral do gráfico | dá |
-| 6 | Notícias (atraso é aceitável) | dá, via RSS |
-| 7 | Morning call | ver abaixo |
-| 8 | Cards de NDX/SPX/QQQ/NQ/ES | pronto |
-| 9 | Botões "gerar GEX para MT5 / TradingView / NinjaTrader" | **só o layout** por enquanto |
-| + | Campo de edição de cores do terminal | dá, salvar em JSON local |
-
-### Item 3 — regras para o texto do market maker
-
-Cruzar três coisas que já temos: sinal do Net GEX, posição do preço em relação
-à inversão gama, e distância até cada parede. Gamma positivo = dealer freia
-(range, reversão à média). Negativo = dealer empurra (movimento esticado).
-Deixar explícito no painel que é leitura de mecânica, não previsão de preço.
-
-### Item 7 — decisão tomada
-
-Fazer primeiro o **morning call factual**, sem IA: fechamento de futuros,
-Europa e Ásia, eventos do calendário, manchetes, regime de gamma e níveis-chave.
-Grátis, sem instalar nada.
-
-Foi explicado ao usuário, e ele concordou, que IA não prevê mercado — colocar
-"hoje deve subir X%" seria fabricar confiança sem base. Se mais tarde ele quiser
-o texto mais redigido, plugar um LLM (chave paga, ou Ollama local com ~4 GB) que
-escreve em cima dos mesmos dados, sem inventar direção.
-
-## Pendências técnicas
-
-1. **Parede de put diverge.** Nossa fica longe do preço (1,4% a 3,3%), a do site
-   fica colada (0,01% a 0,12%). Hipótese: somamos 45 dias (`DIAS_MAX = 45`) e o
-   site usa só o vencimento próximo (os prints dele diziam "0DTE + Weekly").
-   Teste de uma linha pendente: trocar para `DIAS_MAX = 7` e comparar.
-2. **Seletor de vencimento** na interface: 0DTE / semana / mês / 45 dias.
-3. **Barras por strike poluídas** — ~100 linhas por card. Enxugar e marcar onde
-   ficam a inversão gama e as paredes.
-
-## Logística: como entregar o código
-
-O terminal completo deve dar 800 a 1000 linhas. Copiar e colar no Notepad já
-causou dois erros de sintaxe e é inviável nesse tamanho.
-
-**Plano combinado:** o usuário (`dieiser2022-rgb`) vai criar um repositório vazio
-no GitHub e passar o nome. Então tentar `git push` dos arquivos. Tentativa de
-criar o repositório pelo agente deu **HTTP 403**, mas enviar para um repositório
-que ele mesmo criou pode funcionar.
-
-Se o push falhar, plano B: dividir o terminal em arquivos menores e colar aos poucos.
-
-## Cuidado ao gerar código para este usuário
-
-O código vai por copiar e colar, e isso corrompe sequências de escape: `\n`,
-`\t` e `\r` dentro de strings viram caracteres reais e quebram o arquivo.
-Já aconteceu duas vezes.
-
-Regra: **nenhuma barra invertida no arquivo** e **ASCII puro**. Verificar antes
-de entregar. Usar `chr(9)`, `chr(10)`, `print("")` em vez dos escapes.
-(Se o push para o GitHub funcionar, essa restrição deixa de ser necessária.)
+1. **Parede de put divergia** da referência: a nossa ficava 1,4% a 3,3% longe
+   do preço, a do site 0,01% a 0,12%. Hipótese: somávamos 45 dias e o site usa
+   só o vencimento próximo. O seletor de vencimento agora permite testar isso
+   na interface — falta comparar com `0DTE` e `semana` e fechar a questão.
+2. **Item 9**: a exportação em si. Hoje os botões só mostram os níveis em texto
+   para copiar. Falta gerar o formato de cada plataforma (indicador do MT5,
+   script Pine do TradingView, arquivo do NinjaTrader).
+3. **Morning call com IA**, se o usuário quiser depois. Ficou decidido que a
+   versão factual vem primeiro, e que IA não entra para projetar preço — só
+   poderia redigir melhor os mesmos dados.
 
 ## Contexto do usuário
 
 Opera **Nasdaq** (NQ) — NDX/NQ é prioridade, S&P entra como apoio.
 Prefere explicações em português, linguagem simples, passo a passo.
+O código chega até ele por `git pull`, então não há mais a restrição de
+evitar barras invertidas que existia na fase de copiar e colar.

@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal GEX</title>
+<style>
+:root {
+  --fundo: #0b1120; --painel: #111c33; --borda: #1e293b;
+  --texto: #e2e8f0; --apagado: #94a3b8;
+  --alta: #22c55e; --baixa: #ef4444;
+  --call_wall: #f87171; --put_wall: #4ade80; --inversao: #fbbf24;
+  --destaque: #38bdf8; --botao: #2563eb;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fundo); color: var(--texto);
+  font-family: "Segoe UI", Arial, sans-serif; font-size: 14px;
+}
+header {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 18px; border-bottom: 1px solid var(--borda);
+  position: sticky; top: 0; background: var(--fundo); z-index: 20;
+}
+h1 { margin: 0; font-size: 17px; letter-spacing: 2px; }
+button {
+  font-family: inherit; cursor: pointer; border: 0; border-radius: 8px;
+  color: #fff; background: var(--botao); padding: 9px 16px; font-size: 13px;
+}
+button:hover { filter: brightness(1.15); }
+button:disabled { background: #334155; cursor: wait; }
+#atualizar { padding: 14px 30px; font-size: 16px; font-weight: bold; }
+.fantasma { background: transparent; border: 1px solid var(--borda);
+            color: var(--apagado); }
+#status { color: var(--apagado); font-size: 13px; margin-left: auto; }
+
+.grade {
+  display: grid; gap: 12px; padding: 12px 18px 40px;
+  grid-template-columns: 300px 1fr 320px;
+  grid-template-areas:
+    "agenda regime  dica"
+    "manha  grafico news"
+    "cards  cards   cards"
+    "export export  export";
+}
+@media (max-width: 1250px) {
+  .grade { grid-template-columns: 1fr;
+    grid-template-areas: "regime" "dica" "grafico" "agenda" "manha" "news" "cards" "export"; }
+}
+.caixa {
+  background: var(--painel); border: 1px solid var(--borda);
+  border-radius: 10px; padding: 12px 14px; min-width: 0;
+}
+.caixa h2 {
+  margin: 0 0 10px; font-size: 11px; letter-spacing: 1.5px;
+  color: var(--apagado); text-transform: uppercase; font-weight: 600;
+}
+.ag { grid-area: agenda; } .rg { grid-area: regime; }
+.dc { grid-area: dica; }   .gr { grid-area: grafico; }
+.mn { grid-area: manha; }  .nw { grid-area: news; }
+.cd { grid-area: cards; }  .ex { grid-area: export; }
+
+/* ---------- 2: regime em destaque ---------- */
+.rg { display: flex; flex-direction: column; justify-content: center;
+      align-items: center; text-align: center; }
+#gexValor { font-size: 42px; font-weight: bold; line-height: 1; margin: 4px 0; }
+#gexRegime { font-size: 15px; font-weight: bold; letter-spacing: 2px; }
+#gexAtivo { color: var(--apagado); font-size: 12px; }
+.positivo { color: var(--alta); } .negativo { color: var(--baixa); }
+
+/* ---------- 1: agenda ---------- */
+.ev { display: flex; gap: 8px; align-items: baseline; padding: 5px 0;
+      border-bottom: 1px solid rgba(148,163,184,.12); font-size: 12.5px; }
+.ev .hora { color: var(--apagado); width: 42px; flex: none;
+            font-variant-numeric: tabular-nums; }
+.ev .tit { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+           white-space: nowrap; }
+.ev .vals { color: var(--apagado); font-size: 11px; flex: none; }
+.ev.passou { opacity: .45; }
+.imp3 { border-left: 3px solid var(--baixa); padding-left: 6px; }
+.imp2 { border-left: 3px solid var(--inversao); padding-left: 6px; }
+.imp1 { border-left: 3px solid var(--borda); padding-left: 6px; }
+.agora { text-align: center; color: var(--destaque); font-size: 11px;
+         letter-spacing: 1px; padding: 4px 0; }
+
+/* ---------- 3: dica do market maker ---------- */
+.dc p { margin: 0 0 8px; line-height: 1.45; font-size: 13px; }
+.alerta { background: rgba(239,68,68,.12); border-left: 3px solid var(--baixa);
+          padding: 6px 9px; border-radius: 4px; margin-bottom: 6px;
+          font-size: 12.5px; }
+.rodape { color: var(--apagado); font-size: 11px; font-style: italic;
+          margin-top: 8px; }
+
+/* ---------- 4 e 5: grafico ---------- */
+.gr { padding: 8px; }
+.barraTopo { display: flex; gap: 8px; align-items: center; margin-bottom: 6px;
+             flex-wrap: wrap; }
+.barraTopo select, .barraTopo input {
+  background: var(--fundo); color: var(--texto); border: 1px solid var(--borda);
+  border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 12px;
+}
+#svgGrafico { width: 100%; height: 440px; display: block; }
+.legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px;
+           color: var(--apagado); margin-top: 4px; }
+.legenda i { display: inline-block; width: 12px; height: 3px;
+             vertical-align: middle; margin-right: 4px; }
+
+/* ---------- 6: noticias ---------- */
+.nt { padding: 7px 0; border-bottom: 1px solid rgba(148,163,184,.12);
+      cursor: pointer; }
+.nt .meta { color: var(--apagado); font-size: 10.5px; margin-bottom: 2px; }
+.nt .tl { font-size: 12.5px; line-height: 1.35; }
+.nt .rs { color: var(--apagado); font-size: 11.5px; line-height: 1.4;
+          margin-top: 4px; display: none; }
+.nt.aberta .rs { display: block; }
+.nw { max-height: 520px; overflow-y: auto; }
+
+/* ---------- 7: morning call ---------- */
+.mc { margin-bottom: 9px; }
+.mc .t { color: var(--destaque); font-size: 10.5px; letter-spacing: 1px;
+         text-transform: uppercase; margin-bottom: 2px; }
+.mc .v { font-size: 12.5px; line-height: 1.4; }
+.mn { max-height: 520px; overflow-y: auto; }
+
+/* ---------- 8: cards ---------- */
+.cards { display: grid; gap: 10px;
+         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card { background: var(--fundo); border: 1px solid var(--borda);
+        border-radius: 8px; padding: 10px 12px; }
+.card .cab { display: flex; justify-content: space-between;
+             align-items: baseline; margin-bottom: 6px; }
+.card .tic { font-size: 18px; font-weight: bold; }
+.card .sub { color: var(--apagado); font-size: 10.5px; }
+.selo { font-size: 9.5px; font-weight: bold; padding: 3px 7px;
+        border-radius: 12px; letter-spacing: .5px; }
+.selo.pos { background: rgba(34,197,94,.18); color: var(--alta); }
+.selo.neg { background: rgba(239,68,68,.18); color: var(--baixa); }
+.lin { display: flex; justify-content: space-between; padding: 3px 0;
+       font-size: 12.5px; }
+.lin span:first-child { color: var(--apagado); }
+.lin b { font-variant-numeric: tabular-nums; }
+.fut { margin-top: 8px; padding-top: 7px;
+       border-top: 1px dashed var(--borda); }
+
+/* ---------- 9: exportar ---------- */
+.ex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ex .aviso { color: var(--apagado); font-size: 11.5px; }
+
+/* ---------- modais e config ---------- */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.7);
+         display: none; align-items: center; justify-content: center;
+         z-index: 50; padding: 20px; }
+.modal.on { display: flex; }
+.modalCorpo { background: var(--painel); border: 1px solid var(--borda);
+              border-radius: 12px; padding: 18px; max-width: 760px;
+              width: 100%; max-height: 82vh; overflow-y: auto; }
+.cores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+         gap: 8px; }
+.cor { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.cor input[type=color] { width: 34px; height: 26px; padding: 0; border: 0;
+                         background: none; cursor: pointer; }
+table.cal { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.cal td, table.cal th { padding: 5px 6px; text-align: left;
+       border-bottom: 1px solid rgba(148,163,184,.12); }
+table.cal th { color: var(--apagado); font-size: 10.5px; text-transform: uppercase; }
+pre.saida { background: var(--fundo); border: 1px solid var(--borda);
+            border-radius: 8px; padding: 10px; font-size: 12px;
+            overflow-x: auto; white-space: pre; }
+.vazio { color: var(--apagado); font-size: 12px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TERMINAL GEX</h1>
+  <button id="atualizar">ATUALIZAR REGIOES</button>
+  <button class="fantasma" id="btCores">cores</button>
+  <span id="status">clique em atualizar</span>
+</header>
+
+<div class="grade">
+
+  <div class="caixa ag">
+    <h2>1 &middot; Agenda economica</h2>
+    <div id="agenda"><span class="vazio">aguardando...</span></div>
+    <button class="fantasma" id="btAgenda" style="margin-top:8px;width:100%">
+      ver agenda completa</button>
+  </div>
+
+  <div class="caixa rg">
+    <div id="gexAtivo">NDX</div>
+    <div id="gexValor">--</div>
+    <div id="gexRegime">AGUARDANDO</div>
+  </div>
+
+  <div class="caixa dc">
+    <h2>3 &middot; Como o market maker tende a agir</h2>
+    <div id="dica"><span class="vazio">aguardando...</span></div>
+  </div>
+
+  <div class="caixa gr">
+    <div class="barraTopo">
+      <select id="selAtivo">
+        <option value="NQ=F">NQ (futuro Nasdaq)</option>
+        <option value="^NDX">NDX (indice Nasdaq)</option>
+        <option value="ES=F">ES (futuro S&amp;P)</option>
+        <option value="^SPX">SPX (indice S&amp;P)</option>
+      </select>
+      <select id="selIntervalo">
+        <option value="15m">15 min</option>
+        <option value="5m">5 min</option>
+        <option value="1h">1 hora</option>
+        <option value="1d">diario</option>
+      </select>
+      <select id="selJanela">
+        <option value="5d">5 dias</option>
+        <option value="1d">1 dia</option>
+        <option value="1mo">1 mes</option>
+      </select>
+      <select id="selDias">
+        <option value="1">vencimento: 0DTE</option>
+        <option value="7">vencimento: semana</option>
+        <option value="30">vencimento: mes</option>
+        <option value="45" selected>vencimento: 45 dias</option>
+      </select>
+      <span id="infoGrafico" class="vazio"></span>
+    </div>
+    <svg id="svgGrafico" viewBox="0 0 1000 440" preserveAspectRatio="none"></svg>
+    <div class="legenda">
+      <span><i style="background:var(--call_wall)"></i>parede de call</span>
+      <span><i style="background:var(--put_wall)"></i>parede de put</span>
+      <span><i style="background:var(--inversao)"></i>inversao gama</span>
+      <span>linha cheia = nivel exato &middot; tracejada = convertida por proporcao</span>
+    </div>
+  </div>
+
+  <div class="caixa nw">
+    <h2>6 &middot; Noticias</h2>
+    <div id="noticias"><span class="vazio">aguardando...</span></div>
+  </div>
+
+  <div class="caixa mn">
+    <h2>7 &middot; Morning call</h2>
+    <div id="morning"><span class="vazio">aguardando...</span></div>
+  </div>
+
+  <div class="caixa cd">
+    <h2>8 &middot; Niveis por ativo</h2>
+    <div class="cards" id="cards"><span class="vazio">aguardando...</span></div>
+  </div>
+
+  <div class="caixa ex">
+    <button data-destino="mt5">Gerar GEX MT5</button>
+    <button data-destino="tradingview">Gerar GEX TradingView</button>
+    <button data-destino="ninjatrader">Gerar GEX NinjaTrader</button>
+    <span class="aviso">9 &middot; so o layout por enquanto - os botoes mostram
+      os niveis em texto para copiar</span>
+  </div>
+
+</div>
+
+<div class="modal" id="modalCal">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Agenda da semana</h2>
+      <button class="fantasma" data-fecha="modalCal">fechar</button>
+    </div>
+    <div id="calCompleto" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<div class="modal" id="modalCores">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Cores do terminal</h2>
+      <button class="fantasma" data-fecha="modalCores">fechar</button>
+    </div>
+    <div class="cores" id="listaCores" style="margin-top:12px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button id="btSalvarCores">salvar</button>
+      <button class="fantasma" id="btResetCores">voltar ao padrao</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalExport">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0" id="tituloExport">Niveis</h2>
+      <button class="fantasma" data-fecha="modalExport">fechar</button>
+    </div>
+    <p class="aviso" id="avisoExport" style="color:var(--apagado)"></p>
+    <pre class="saida" id="saidaExport"></pre>
+    <button id="btCopiar">copiar</button>
+  </div>
+</div>
+
+<script>
+const ATIVOS = ["NDX", "SPX", "QQQ", "SPY"];
+const estado = { gamma: {}, cores: {}, grafico: null };
+
+const $ = s => document.querySelector(s);
+const el = (t, c) => { const n = document.createElement(t); if (c) n.className = c; return n; };
+
+function num(v, dec) {
+  if (v === null || v === undefined || isNaN(v)) return "N/A";
+  return Number(v).toLocaleString("pt-BR",
+    { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function dinheiro(v) {
+  if (v === null || v === undefined) return "N/A";
+  const a = Math.abs(v);
+  if (a >= 1e9) return (v / 1e9).toFixed(2) + " B";
+  if (a >= 1e6) return (v / 1e6).toFixed(0) + " M";
+  if (a >= 1e3) return (v / 1e3).toFixed(0) + " K";
+  return v.toFixed(0);
+}
+function hora(ts) {
+  return new Date(ts * 1000).toLocaleTimeString("pt-BR",
+    { hour: "2-digit", minute: "2-digit" });
+}
+function dia(ts) {
+  return new Date(ts * 1000).toLocaleDateString("pt-BR",
+    { day: "2-digit", month: "2-digit" });
+}
+async function pega(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+/* ---------------------------------------------------- 1: agenda */
+function linhaEvento(e, passou) {
+  const d = el("div", "ev imp" + (e.peso || 0) + (passou ? " passou" : ""));
+  const h = el("span", "hora"); h.textContent = hora(e.ts);
+  const t = el("span", "tit");
+  t.textContent = (e.moeda ? e.moeda + " " : "") + e.titulo;
+  t.title = e.titulo;
+  const v = el("span", "vals");
+  const partes = [];
+  if (e.previsao) partes.push("prev " + e.previsao);
+  if (e.anterior) partes.push("ant " + e.anterior);
+  v.textContent = partes.join(" / ");
+  d.append(h, t, v);
+  return d;
+}
+
+function mostraAgenda(d) {
+  const alvo = $("#agenda"); alvo.innerHTML = "";
+  if (!d || (!d.antes.length && !d.depois.length)) {
+    alvo.innerHTML = '<span class="vazio">agenda indisponivel agora</span>';
+    return;
+  }
+  d.antes.forEach(e => alvo.appendChild(linhaEvento(e, true)));
+  const marca = el("div", "agora");
+  marca.textContent = "— agora —";
+  alvo.appendChild(marca);
+  d.depois.forEach(e => alvo.appendChild(linhaEvento(e, false)));
+
+  const full = $("#calCompleto"); full.innerHTML = "";
+  if (!d.todos.length) { full.innerHTML = '<span class="vazio">nada</span>'; return; }
+  const tb = el("table", "cal");
+  tb.innerHTML = "<tr><th>dia</th><th>hora</th><th>moeda</th><th>evento</th>"
+               + "<th>previsao</th><th>anterior</th></tr>";
+  d.todos.forEach(e => {
+    const tr = el("tr", "imp" + (e.peso || 0));
+    if (e.ts <= d.agora) tr.style.opacity = ".45";
+    tr.innerHTML = "<td>" + dia(e.ts) + "</td><td>" + hora(e.ts) + "</td><td>"
+      + (e.moeda || "") + "</td><td>" + e.titulo + "</td><td>"
+      + (e.previsao || "") + "</td><td>" + (e.anterior || "") + "</td>";
+    tb.appendChild(tr);
+  });
+  full.appendChild(tb);
+}
+
+/* ---------------------------------------------------- 2 e 3 */
+function mostraRegime(d) {
+  if (!d || d.erro) return;
+  $("#gexAtivo").textContent = d.indice + " - GEX liquido por 1%";
+  const pos = (d.net_gex || 0) > 0;
+  const vv = $("#gexValor");
+  vv.textContent = (pos ? "+" : "") + dinheiro(d.net_gex);
+  vv.className = pos ? "positivo" : "negativo";
+  const rr = $("#gexRegime");
+  rr.textContent = "GAMA " + (pos ? "POSITIVO" : "NEGATIVO");
+  rr.className = pos ? "positivo" : "negativo";
+}
+
+function mostraDica(d) {
+  const alvo = $("#dica"); alvo.innerHTML = "";
+  const L = d && d.leitura;
+  if (!L || !L.frases.length) {
+    alvo.innerHTML = '<span class="vazio">sem dados</span>'; return;
+  }
+  (L.alertas || []).forEach(a => {
+    const x = el("div", "alerta"); x.textContent = a; alvo.appendChild(x);
+  });
+  L.frases.forEach(f => {
+    const p = el("p"); p.textContent = f; alvo.appendChild(p);
+  });
+  const r = el("div", "rodape");
+  r.textContent = "Leitura da mecanica de hedge, nao previsao de preco.";
+  alvo.appendChild(r);
+}
+
+/* ---------------------------------------------------- 4 e 5: grafico */
+function desenhaGrafico(dados) {
+  const svg = $("#svgGrafico");
+  svg.innerHTML = "";
+  const velas = (dados && dados.candles) || [];
+  const niveis = (dados && dados.niveis) || [];
+  if (!velas.length) {
+    svg.innerHTML = '<text x="500" y="220" fill="#94a3b8" font-size="14"'
+      + ' text-anchor="middle">sem candles para mostrar</text>';
+    return;
+  }
+
+  const L = 8, R = 760, T = 14, B = 410;   // area dos candles
+  const PX = 790, PR = 935;                // area do perfil de gamma
+  let min = Infinity, max = -Infinity;
+  velas.forEach(v => { min = Math.min(min, v.l); max = Math.max(max, v.h); });
+  niveis.forEach(n => {
+    if (n.preco > min * 0.97 && n.preco < max * 1.03) {
+      min = Math.min(min, n.preco); max = Math.max(max, n.preco);
+    }
+  });
+  const folga = (max - min) * 0.06 || 1;
+  min -= folga; max += folga;
+  const y = p => B - (p - min) / (max - min) * (B - T);
+  const larg = (R - L) / velas.length;
+
+  const ns = "http://www.w3.org/2000/svg";
+  const add = (tag, attrs, texto) => {
+    const n = document.createElementNS(ns, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (texto !== undefined) n.textContent = texto;
+    svg.appendChild(n); return n;
+  };
+
+  // grade de preco
+  for (let i = 0; i <= 4; i++) {
+    const p = min + (max - min) * i / 4;
+    add("line", { x1: L, y1: y(p), x2: R, y2: y(p),
+                  stroke: "rgba(148,163,184,.12)", "stroke-width": 1 });
+    add("text", { x: R + 4, y: y(p) + 4, fill: "#94a3b8", "font-size": 10 },
+        num(p, p > 2000 ? 0 : 2));
+  }
+
+  // candles
+  velas.forEach((v, i) => {
+    const cx = L + i * larg + larg / 2;
+    const sobe = v.c >= v.o;
+    const cor = sobe ? getCor("alta") : getCor("baixa");
+    add("line", { x1: cx, y1: y(v.h), x2: cx, y2: y(v.l),
+                  stroke: cor, "stroke-width": 1 });
+    const altura = Math.max(Math.abs(y(v.o) - y(v.c)), 1);
+    add("rect", { x: cx - Math.max(larg * 0.32, 0.7),
+                  y: Math.min(y(v.o), y(v.c)),
+                  width: Math.max(larg * 0.64, 1.4), height: altura,
+                  fill: cor });
+  });
+
+  // ultimo preco
+  const ult = velas[velas.length - 1].c;
+  add("line", { x1: L, y1: y(ult), x2: R, y2: y(ult),
+                stroke: getCor("destaque"), "stroke-width": 1,
+                "stroke-dasharray": "2 3", opacity: .9 });
+  add("text", { x: L + 3, y: y(ult) - 4, fill: getCor("destaque"),
+                "font-size": 11, "font-weight": "bold" }, num(ult, 2));
+
+  // niveis de gamma
+  niveis.forEach(n => {
+    if (n.preco < min || n.preco > max) return;
+    const cor = getCor(n.cor);
+    add("line", { x1: L, y1: y(n.preco), x2: R, y2: y(n.preco),
+                  stroke: cor, "stroke-width": n.exato ? 1.6 : 1,
+                  "stroke-dasharray": n.exato ? "" : "5 4",
+                  opacity: n.exato ? .95 : .55 });
+    add("text", { x: L + 4, y: y(n.preco) - 3, fill: cor,
+                  "font-size": 9.5,
+                  "font-weight": n.exato ? "bold" : "normal" },
+        n.rotulo + "  " + num(n.preco, 0));
+  });
+
+  // perfil de gamma lateral
+  const barras = (estado.gamma[dados.base] && estado.gamma[dados.base].barras) || [];
+  if (barras.length) {
+    let maior = 0;
+    barras.forEach(b => maior = Math.max(maior, Math.abs(b.v)));
+    const fator = dados.fator || 1, desvio = dados.desvio || 0;
+    add("text", { x: PX, y: T - 2, fill: "#94a3b8", "font-size": 9.5 },
+        "perfil de gamma");
+    barras.forEach(b => {
+      const preco = b.k * fator + desvio;
+      if (preco < min || preco > max || !maior) return;
+      const w = Math.abs(b.v) / maior * (PR - PX);
+      add("rect", { x: PX, y: y(preco) - 2.4, width: Math.max(w, 0.6),
+                    height: 4.8,
+                    fill: b.v > 0 ? getCor("alta") : getCor("baixa"),
+                    opacity: .8 });
+    });
+    add("line", { x1: PX, y1: T, x2: PX, y2: B,
+                  stroke: "rgba(148,163,184,.3)", "stroke-width": 1 });
+  }
+
+  // eixo do tempo
+  const passo = Math.max(1, Math.floor(velas.length / 6));
+  for (let i = 0; i < velas.length; i += passo) {
+    const d = new Date(velas[i].t * 1000);
+    add("text", { x: L + i * larg, y: B + 16, fill: "#94a3b8", "font-size": 9.5 },
+        d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+  }
+}
+
+function getCor(nome) {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue("--" + nome).trim() || "#888";
+}
+
+/* ---------------------------------------------------- 6: noticias */
+function mostraNoticias(d) {
+  const alvo = $("#noticias"); alvo.innerHTML = "";
+  const lista = (d && d.noticias) || [];
+  if (!lista.length) {
+    alvo.innerHTML = '<span class="vazio">noticias indisponiveis agora</span>';
+    return;
+  }
+  lista.forEach(n => {
+    const c = el("div", "nt");
+    const m = el("div", "meta");
+    m.textContent = n.fonte + (n.ts ? "  -  " + dia(n.ts) + " " + hora(n.ts) : "");
+    const t = el("div", "tl"); t.textContent = n.titulo;
+    const r = el("div", "rs");
+    r.textContent = n.resumo || "(sem resumo)";
+    if (n.link) {
+      const a = el("a");
+      a.href = n.link; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "abrir materia";
+      a.style.color = "var(--destaque)";
+      a.style.fontSize = "11px";
+      r.appendChild(el("br")); r.appendChild(a);
+    }
+    c.append(m, t, r);
+    c.addEventListener("click", ev => {
+      if (ev.target.tagName !== "A") c.classList.toggle("aberta");
+    });
+    alvo.appendChild(c);
+  });
+}
+
+/* ---------------------------------------------------- 7: morning call */
+function mostraMorning(d) {
+  const alvo = $("#morning"); alvo.innerHTML = "";
+  const blocos = (d && d.blocos) || [];
+  if (!blocos.length) {
+    alvo.innerHTML = '<span class="vazio">sem dados</span>'; return;
+  }
+  blocos.forEach(b => {
+    const c = el("div", "mc");
+    const t = el("div", "t"); t.textContent = b.titulo;
+    const v = el("div", "v"); v.textContent = b.texto;
+    c.append(t, v); alvo.appendChild(c);
+  });
+  if (d.aviso) {
+    const r = el("div", "rodape"); r.textContent = d.aviso;
+    alvo.appendChild(r);
+  }
+}
+
+/* ---------------------------------------------------- 8: cards */
+function montaCard(d) {
+  const c = el("div", "card");
+  if (d.erro) {
+    c.innerHTML = '<div class="tic">' + (d.indice || "?") + "</div>"
+      + '<div class="sub">' + d.erro + "</div>";
+    return c;
+  }
+  const dec = d.spot > 2000 ? 0 : 2;
+  const pos = (d.net_gex || 0) > 0;
+  const cab = el("div", "cab");
+  cab.innerHTML = '<div><div class="tic">' + d.indice + "</div>"
+    + '<div class="sub">' + d.contratos + " contratos &middot; "
+    + d.dias_max + "d</div></div>"
+    + '<span class="selo ' + (pos ? "pos" : "neg") + '">GAMA '
+    + (pos ? "POSITIVO" : "NEGATIVO") + "</span>";
+  c.appendChild(cab);
+
+  const lin = (rot, val, cor) => {
+    const l = el("div", "lin");
+    l.innerHTML = "<span>" + rot + "</span><b"
+      + (cor ? ' style="color:var(--' + cor + ')"' : "") + ">" + val + "</b>";
+    return l;
+  };
+  c.appendChild(lin("Spot", num(d.spot, dec)));
+  c.appendChild(lin("Inversao gama", num(d.zero_gamma, dec), "inversao"));
+  c.appendChild(lin("Parede de call", num(d.call_wall, dec), "call_wall"));
+  c.appendChild(lin("Parede de put", num(d.put_wall, dec), "put_wall"));
+  c.appendChild(lin("GEX liquido", "US$ " + dinheiro(d.net_gex)));
+
+  if (d.futuro) {
+    const f = d.futuro, w = el("div", "fut");
+    w.appendChild(lin("<b>" + f.nome + "</b> (basis " + num(f.basis, 2) + ")",
+                      num(f.preco, 2)));
+    w.appendChild(lin("Inversao gama", num(f.zero_gamma, 0), "inversao"));
+    w.appendChild(lin("Parede de call", num(f.call_wall, 0), "call_wall"));
+    w.appendChild(lin("Parede de put", num(f.put_wall, 0), "put_wall"));
+    c.appendChild(w);
+  }
+  return c;
+}
+
+function mostraCards() {
+  const alvo = $("#cards"); alvo.innerHTML = "";
+  ATIVOS.forEach(a => {
+    const d = estado.gamma[a];
+    if (d) alvo.appendChild(montaCard(d));
+  });
+  if (!alvo.children.length) {
+    alvo.innerHTML = '<span class="vazio">aguardando...</span>';
+  }
+}
+
+/* ---------------------------------------------------- grafico: buscar */
+async function carregaGrafico() {
+  const simbolo = $("#selAtivo").value;
+  const intervalo = $("#selIntervalo").value;
+  const janela = $("#selJanela").value;
+  $("#infoGrafico").textContent = "buscando candles...";
+  try {
+    const d = await pega("/api/candles?simbolo=" + encodeURIComponent(simbolo)
+      + "&intervalo=" + intervalo + "&janela=" + janela);
+    // base e fator usados pelo perfil lateral
+    const ehNasdaq = simbolo === "NQ=F" || simbolo === "^NDX";
+    d.base = ehNasdaq ? "NDX" : "SPX";
+    const principal = estado.gamma[d.base];
+    d.fator = 1;
+    d.desvio = (simbolo.endsWith("=F") && principal && principal.futuro)
+      ? principal.futuro.basis : 0;
+    estado.grafico = d;
+    desenhaGrafico(d);
+    $("#infoGrafico").textContent = d.candles.length + " candles  -  "
+      + d.niveis.length + " niveis";
+  } catch (e) {
+    $("#infoGrafico").textContent = "falhou: " + e.message;
+  }
+}
+
+/* ---------------------------------------------------- cores */
+async function carregaConfig() {
+  try {
+    const cfg = await pega("/api/config");
+    estado.cores = cfg.cores || {};
+    aplicaCores(estado.cores);
+    if (cfg.dias_max) $("#selDias").value = String(cfg.dias_max);
+    if (cfg.grafico) $("#selAtivo").value = cfg.grafico;
+  } catch (e) { }
+}
+function aplicaCores(cores) {
+  for (const k in cores) {
+    document.documentElement.style.setProperty("--" + k, cores[k]);
+  }
+}
+function montaEditorCores() {
+  const alvo = $("#listaCores"); alvo.innerHTML = "";
+  const rotulos = {
+    fundo: "fundo", painel: "painel", borda: "borda", texto: "texto",
+    apagado: "texto apagado", alta: "alta", baixa: "baixa",
+    call_wall: "parede de call", put_wall: "parede de put",
+    inversao: "inversao gama", destaque: "destaque", botao: "botao"
+  };
+  for (const k in rotulos) {
+    const d = el("div", "cor");
+    const i = el("input"); i.type = "color"; i.dataset.chave = k;
+    i.value = (estado.cores[k] || getCor(k) || "#000000").slice(0, 7);
+    const s = el("span"); s.textContent = rotulos[k];
+    d.append(i, s); alvo.appendChild(d);
+    i.addEventListener("input", () => {
+      document.documentElement.style.setProperty("--" + k, i.value);
+      if (estado.grafico) desenhaGrafico(estado.grafico);
+    });
+  }
+}
+
+/* ---------------------------------------------------- 9: exportar */
+async function exportar(destino) {
+  const simbolo = $("#selAtivo").value;
+  const d = await pega("/api/exportar?destino=" + destino
+    + "&simbolo=" + encodeURIComponent(simbolo));
+  $("#tituloExport").textContent = "Niveis para " + destino.toUpperCase();
+  $("#avisoExport").textContent = d.aviso || "";
+  const linhas = (d.niveis || []).map(n =>
+    n.rotulo.padEnd(22) + num(n.preco, 2) + (n.exato ? "" : "   (aproximado)"));
+  $("#saidaExport").textContent = linhas.length
+    ? (simbolo + "  -  " + new Date().toLocaleString("pt-BR") + "\n\n"
+       + linhas.join("\n"))
+    : "sem niveis calculados ainda - clique em ATUALIZAR REGIOES primeiro";
+  $("#modalExport").classList.add("on");
+}
+
+/* ---------------------------------------------------- atualizar tudo */
+async function atualizarTudo() {
+  const bt = $("#atualizar");
+  bt.disabled = true;
+  const t0 = Date.now();
+  const dias = $("#selDias").value;
+  const passos = [];
+
+  passos.push(["panorama", async () => {
+    const d = await pega("/api/panorama"); return d;
+  }]);
+  passos.push(["agenda", async () => {
+    const d = await pega("/api/calendario"); mostraAgenda(d); return d;
+  }]);
+  passos.push(["noticias", async () => {
+    const d = await pega("/api/noticias"); mostraNoticias(d); return d;
+  }]);
+  ATIVOS.forEach(a => passos.push([a, async () => {
+    const d = await pega("/api/gamma?simbolo=" + a + "&dias=" + dias);
+    estado.gamma[a] = d;
+    mostraCards();
+    if (a === "NDX") { mostraRegime(d); mostraDica(d); }
+    return d;
+  }]));
+  passos.push(["grafico", carregaGrafico]);
+  passos.push(["morning call", async () => {
+    const d = await pega("/api/morningcall"); mostraMorning(d); return d;
+  }]);
+
+  for (let i = 0; i < passos.length; i++) {
+    const [nome, fn] = passos[i];
+    $("#status").textContent = "buscando " + nome + "  (" + (i + 1)
+      + "/" + passos.length + ")";
+    try { await fn(); } catch (e) {
+      console.warn(nome, e);
+    }
+  }
+  const seg = ((Date.now() - t0) / 1000).toFixed(0);
+  $("#status").textContent = "atualizado as "
+    + new Date().toLocaleTimeString("pt-BR") + "  (" + seg + "s)";
+  bt.disabled = false;
+}
+
+/* ---------------------------------------------------- eventos */
+$("#atualizar").addEventListener("click", atualizarTudo);
+$("#btAgenda").addEventListener("click", () => $("#modalCal").classList.add("on"));
+$("#btCores").addEventListener("click", () => {
+  montaEditorCores(); $("#modalCores").classList.add("on");
+});
+document.querySelectorAll("[data-fecha]").forEach(b => {
+  b.addEventListener("click", () => $("#" + b.dataset.fecha).classList.remove("on"));
+});
+document.querySelectorAll(".modal").forEach(m => {
+  m.addEventListener("click", e => { if (e.target === m) m.classList.remove("on"); });
+});
+$("#btSalvarCores").addEventListener("click", async () => {
+  const cores = {};
+  document.querySelectorAll("#listaCores input[type=color]").forEach(i => {
+    cores[i.dataset.chave] = i.value;
+  });
+  estado.cores = cores;
+  await fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cores: cores, dias_max: Number($("#selDias").value),
+                           grafico: $("#selAtivo").value })
+  });
+  $("#modalCores").classList.remove("on");
+});
+$("#btResetCores").addEventListener("click", async () => {
+  await fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cores: {
+      fundo: "#0b1120", painel: "#111c33", borda: "#1e293b",
+      texto: "#e2e8f0", apagado: "#94a3b8", alta: "#22c55e", baixa: "#ef4444",
+      call_wall: "#f87171", put_wall: "#4ade80", inversao: "#fbbf24",
+      destaque: "#38bdf8", botao: "#2563eb" } })
+  });
+  location.reload();
+});
+["selAtivo", "selIntervalo", "selJanela"].forEach(id => {
+  $("#" + id).addEventListener("change", carregaGrafico);
+});
+$("#selDias").addEventListener("change", () => {
+  $("#status").textContent = "vencimento alterado - clique em atualizar";
+});
+document.querySelectorAll(".ex button[data-destino]").forEach(b => {
+  b.addEventListener("click", () => exportar(b.dataset.destino));
+});
+$("#btCopiar").addEventListener("click", () => {
+  navigator.clipboard.writeText($("#saidaExport").textContent);
+  $("#btCopiar").textContent = "copiado!";
+  setTimeout(() => $("#btCopiar").textContent = "copiar", 1500);
+});
+window.addEventListener("resize", () => {
+  if (estado.grafico) desenhaGrafico(estado.grafico);
+});
+
+carregaConfig().then(atualizarTudo);
+</script>
+</body>
+</html>

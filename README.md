@@ -6,7 +6,36 @@ site de terceiros e sem precisar de login, cadastro ou chave de API.
 
 Roda inteiro com a biblioteca padrão do Python. **Não há nada para instalar.**
 
-## O que ele mostra
+## O painel
+
+```
+┌────────────┬──────────────────────┬─────────────┐
+│ agenda     │   GEX em destaque    │ market      │
+│ economica  │   e regime de gama   │ maker       │
+├────────────┼──────────────────────┼─────────────┤
+│ morning    │  candles + niveis    │ noticias    │
+│ call       │  + perfil de gamma   │             │
+├────────────┴──────────────────────┴─────────────┤
+│ cards: NDX  SPX  QQQ  SPY  (+ NQ e ES)          │
+├─────────────────────────────────────────────────┤
+│ exportar: MT5 | TradingView | NinjaTrader       │
+└─────────────────────────────────────────────────┘
+```
+
+- **Agenda econômica** — 3 eventos antes e 3 depois do momento atual, com
+  previsão e valor anterior. Botão para abrir a semana inteira.
+- **Regime de gama** — GEX líquido grande, verde ou vermelho.
+- **Market maker** — texto explicando como o hedge dos dealers tende a agir,
+  com alertas quando o preço está colado num nível.
+- **Gráfico** — candles de 15 minutos com as paredes e a inversão gama
+  plotadas, mais o perfil de gamma por strike na lateral.
+- **Notícias** — manchetes de várias fontes; clique para expandir o resumo.
+- **Morning call** — futuros, Europa, Ásia, VIX, juros, commodities, eventos
+  do dia, estrutura de gamma e manchetes.
+- **Cores** — botão `cores` no topo permite trocar a paleta, salva em disco.
+- **Vencimento** — seletor de 0DTE, semana, mês ou 45 dias, que muda os níveis.
+
+## Os números
 
 Para NDX, SPX, QQQ e SPY:
 
