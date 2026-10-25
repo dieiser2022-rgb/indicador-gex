@@ -90,32 +90,33 @@ TICKERS_PADRAO = {
     "ninjatrader": "MNQ",
 }
 
-# Em que preco a plataforma cota o ativo: no futuro ou no indice a vista.
-# Importa porque a diferenca entre os dois (o basis) passa de 200 pontos no
-# Nasdaq - usar a base errada desloca todos os niveis de uma vez.
-# NQ, MNQ e NQ1! seguem o futuro. CFDs como USTEC dependem da corretora.
-BASES_PADRAO = {
-    "mt5": "futuro",
-    "tradingview": "futuro",
-    "ninjatrader": "futuro",
+# Em que preco cada ativo e cotado: no futuro ou no indice a vista. Importa
+# porque a diferenca (o basis) passa de 200 pontos no Nasdaq - usar a base
+# errada desloca todos os niveis de uma vez.
+# MNQ e futuro sempre. USTEC e US100 sao CFD e dependem da corretora.
+ATIVOS_PADRAO = {
+    "MNQ": "futuro",
+    "USTEC": "futuro",
+    "US100": "futuro",
 }
+
+PLATAFORMAS = ("mt5", "ninjatrader", "tradingview")
 
 
 def ler_config():
-    cfg = {"cores": dict(CORES_PADRAO), "tickers": dict(TICKERS_PADRAO),
-           "bases": dict(BASES_PADRAO),
-           "dias_max": 45, "grafico": GRAFICO_PADRAO}
+    cfg = {"cores": dict(CORES_PADRAO), "ativos": dict(ATIVOS_PADRAO),
+           "plataforma": "mt5", "dias_max": 45, "grafico": GRAFICO_PADRAO}
     if os.path.exists(CONFIG):
         try:
             salvo = json.loads(open(CONFIG, encoding="utf-8").read())
             if isinstance(salvo.get("cores"), dict):
                 cfg["cores"].update(salvo["cores"])
-            if isinstance(salvo.get("tickers"), dict):
-                cfg["tickers"].update(salvo["tickers"])
-            if isinstance(salvo.get("bases"), dict):
-                cfg["bases"].update({k: v for k, v in salvo["bases"].items()
-                                     if k in BASES_PADRAO
-                                     and v in ("futuro", "indice")})
+            if isinstance(salvo.get("ativos"), dict):
+                cfg["ativos"].update({k: v for k, v in salvo["ativos"].items()
+                                      if k in ATIVOS_PADRAO
+                                      and v in ("futuro", "indice")})
+            if salvo.get("plataforma") in PLATAFORMAS:
+                cfg["plataforma"] = salvo["plataforma"]
             for chave in ("dias_max", "grafico"):
                 if chave in salvo:
                     cfg[chave] = salvo[chave]
@@ -140,14 +141,12 @@ def gravar_config(novo):
     if isinstance(novo.get("cores"), dict):
         cfg["cores"].update({k: v for k, v in novo["cores"].items()
                              if k in CORES_PADRAO})
-    if isinstance(novo.get("tickers"), dict):
-        cfg["tickers"].update({k: str(v).strip().upper()[:24]
-                               for k, v in novo["tickers"].items()
-                               if k in TICKERS_PADRAO})
-    if isinstance(novo.get("bases"), dict):
-        cfg["bases"].update({k: v for k, v in novo["bases"].items()
-                             if k in BASES_PADRAO
-                             and v in ("futuro", "indice")})
+    if isinstance(novo.get("ativos"), dict):
+        cfg["ativos"].update({k: v for k, v in novo["ativos"].items()
+                              if k in ATIVOS_PADRAO
+                              and v in ("futuro", "indice")})
+    if novo.get("plataforma") in PLATAFORMAS:
+        cfg["plataforma"] = novo["plataforma"]
     if "dias_max" in novo:
         try:
             cfg["dias_max"] = max(0, int(novo["dias_max"]))
@@ -324,29 +323,39 @@ def rota_morningcall(args):
 
 
 def rota_exportar(args):
-    """Linha de dados pronta para colar no indicador da plataforma."""
+    """Linha de dados pronta para colar no indicador da plataforma.
+
+    O ativo (MNQ, USTEC, US100) define o nome e a base de preco. A plataforma
+    (MT5, NinjaTrader, TradingView) define o formato - hoje os tres usam a
+    mesma linha de texto, mas isso muda quando cada um ganhar arquivo proprio.
+    """
     cfg = ler_config()
-    destino = (args.get("destino") or ["texto"])[0]
+    ativo = (args.get("ativo") or ["MNQ"])[0].upper()
+    if ativo not in cfg["ativos"]:
+        ativo = "MNQ"
+    plataforma = (args.get("plataforma") or [cfg["plataforma"]])[0]
+    if plataforma not in PLATAFORMAS:
+        plataforma = "mt5"
     simbolo = (args.get("simbolo") or [cfg["grafico"]])[0]
-    ticker = cfg["tickers"].get(destino, "")
     dias = int((args.get("dias") or [cfg["dias_max"]])[0])
+    ticker = ativo
 
     indice = "NDX" if simbolo in ("NQ=F", "^NDX") else "SPX"
 
     try:
         dados = G.baixar(indice)
     except Exception as e:
-        return {"destino": destino, "erro": "nao foi possivel baixar a CBOE: "
-                + str(e)}
+        return {"ativo": ativo, "plataforma": plataforma,
+                "erro": "nao foi possivel baixar a CBOE: " + str(e)}
 
     calc = exportar.calcular(G, dados, dias_padrao=dias)
     if not calc:
-        return {"destino": destino,
+        return {"ativo": ativo, "plataforma": plataforma,
                 "erro": "sem contratos usaveis para " + indice}
 
-    # Base de preco da plataforma de destino. Quem cota o indice a vista nao
-    # leva o basis; quem cota o futuro leva.
-    base = cfg["bases"].get(destino, "futuro")
+    # Base de preco do ativo escolhido. Quem segue o indice a vista nao leva
+    # o basis; quem segue o futuro leva.
+    base = cfg["ativos"].get(ativo, "futuro")
     basis = 0.0
     preco_futuro = None
     if simbolo.endswith("=F"):
@@ -381,7 +390,8 @@ def rota_exportar(args):
                  "fechamento.")
 
     return {
-        "destino": destino, "simbolo": simbolo, "indice": indice,
+        "ativo": ativo, "plataforma": plataforma,
+        "simbolo": simbolo, "indice": indice,
         "ticker": ticker, "linha": linha, "valores": valores,
         "spot": calc["spot"], "basis": basis, "iv": calc["iv"],
         "base": base, "preco_futuro": preco_futuro,

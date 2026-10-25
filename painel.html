@@ -168,19 +168,31 @@ button:disabled { background: #334155; cursor: wait; }
          gap: 6px; flex-wrap: wrap; }
 /* com quatro opcoes o espaco fica justo: deixa quebrar para a linha de baixo
    em vez de espremer ou cortar */
-/* O caminho normal e um botao so, para MNQ. O USTEC fica atras de uma
-   caixinha porque e o caso em que a base de preco pode mudar. */
-#btGerar { width: 100%; padding: 13px 10px; font-size: 13px; font-weight: bold;
-           letter-spacing: .5px; }
-#estadoGerar { min-height: 14px; margin: 6px 0 2px; }
-.opcao { display: flex; align-items: center; gap: 6px; cursor: pointer;
-         font-size: 11.5px; color: var(--apagado); margin: 8px 0 0; }
-.opcao:hover { color: var(--texto); }
-.opcao input { accent-color: var(--destaque); margin: 0; cursor: pointer; }
+/* Ativo a esquerda, plataforma a direita: o ativo define o nome e a base de
+   preco, a plataforma define o formato. */
+.gerarGrade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ativos { display: flex; flex-direction: column; gap: 7px; }
+.ativos button.ativo { padding: 14px 8px; font-size: 12.5px; font-weight: bold;
+                       letter-spacing: .5px; background: transparent;
+                       border: 1px solid var(--borda); color: var(--texto); }
+.ativos button.ativo:hover { border-color: var(--botao);
+                             background: rgba(37,99,235,.12); }
+.ativos button.ativo.ok { background: var(--alta); border-color: var(--alta);
+                          color: #0b1120; }
+.plataformas { display: flex; flex-direction: column; gap: 7px;
+               justify-content: flex-start; }
+.plataformas label { display: flex; align-items: center; gap: 6px;
+                     cursor: pointer; font-size: 11px; color: var(--apagado);
+                     letter-spacing: .3px; }
+.plataformas label:hover { color: var(--texto); }
+.plataformas input { accent-color: var(--destaque); margin: 0; cursor: pointer;
+                     width: 15px; height: 15px; }
+.baseAtivo { display: flex; align-items: center; gap: 6px; margin-top: auto;
+             padding-top: 8px; font-size: 10px; color: var(--apagado);
+             text-transform: uppercase; letter-spacing: .5px; }
+#estadoGerar { min-height: 14px; margin: 9px 0 0; }
 .escondido { display: none; }
-.linhaUstec { display: flex; align-items: center; gap: 7px; margin: 8px 0 4px;
-              font-size: 11.5px; color: var(--apagado); }
-#btVer { width: 100%; margin-top: 10px; font-size: 11.5px; }
+#btVer { width: 100%; margin-top: 8px; font-size: 11.5px; }
 .ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
              margin-top: 8px; display: block; }
 button.base { padding: 5px 11px; background: transparent;
@@ -246,23 +258,23 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
 
     <div class="caixa ex">
       <h2>9 &middot; Gerar GEX</h2>
-      <button id="btGerar">COPIAR NIVEIS - MNQ</button>
-      <div id="estadoGerar" class="aviso"></div>
-
-      <label class="opcao">
-        <input type="checkbox" id="chkUstec"> gerar para USTEC (MetaTrader)
-      </label>
-
-      <div id="caixaUstec" class="escondido">
-        <div class="linhaUstec">
-          <span>O USTEC da sua corretora segue</span>
-          <button class="base" data-base="mt5">FUT</button>
+      <div class="gerarGrade">
+        <div class="ativos">
+          <button class="ativo" data-ativo="MNQ">MNQ</button>
+          <button class="ativo" data-ativo="USTEC">USTEC</button>
+          <button class="ativo" data-ativo="US100">US100</button>
         </div>
-        <span class="aviso">Veja o preco do USTEC no MetaTrader: se estiver
-          perto do indice, troque para <b>IDX</b>. A diferenca passa de 200
-          pontos.</span>
+        <div class="plataformas">
+          <label><input type="radio" name="plat" value="mt5"> MT5</label>
+          <label><input type="radio" name="plat" value="ninjatrader"> NINJA TRADER</label>
+          <label><input type="radio" name="plat" value="tradingview"> TRADING VIEW</label>
+          <div class="baseAtivo">
+            <span id="rotuloBase">base</span>
+            <button class="base" id="btBase">FUT</button>
+          </div>
+        </div>
       </div>
-
+      <div id="estadoGerar" class="aviso"></div>
       <button class="fantasma" id="btVer">ver os niveis antes de colar</button>
     </div>
   </div>
@@ -754,11 +766,11 @@ async function carregaConfig() {
     aplicaCores(estado.cores);
     if (cfg.dias_max) $("#selDias").value = String(cfg.dias_max);
     if (cfg.grafico) $("#selAtivo").value = cfg.grafico;
-    const bs = cfg.bases || {};
-    document.querySelectorAll("button.base").forEach(b => {
-      pintaBase(b, bs[b.dataset.base] || "futuro");
-    });
-    ajustaCaixaUstec();
+    estado.ativos = cfg.ativos || {};
+    const plat = cfg.plataforma || "mt5";
+    const marca = document.querySelector("input[name=plat][value=" + plat + "]");
+    if (marca) marca.checked = true;
+    mostraBaseDoAtivo();
   } catch (e) { }
 }
 
@@ -769,16 +781,6 @@ function pintaBase(botao, valor) {
   botao.dataset.valor = valor;
 }
 
-function salvaBases() {
-  const bases = {};
-  document.querySelectorAll("button.base").forEach(b => {
-    bases[b.dataset.base] = b.dataset.valor || "futuro";
-  });
-  fetch("/api/config", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bases: bases })
-  }).catch(() => { });
-}
 function aplicaCores(cores) {
   for (const k in cores) {
     document.documentElement.style.setProperty("--" + k, cores[k]);
@@ -806,10 +808,11 @@ function montaEditorCores() {
 }
 
 /* ---------------------------------------------------- 9: exportar */
-async function textoNiveis(destino) {
+async function textoNiveis(ativo, plataforma) {
   const simbolo = $("#selAtivo").value;
   const dias = $("#selDias").value;
-  const d = await pega("/api/exportar?destino=" + destino
+  const d = await pega("/api/exportar?ativo=" + encodeURIComponent(ativo)
+    + "&plataforma=" + plataforma
     + "&simbolo=" + encodeURIComponent(simbolo) + "&dias=" + dias);
   if (d.erro) return { corpo: "", erro: d.erro, vazio: true };
   return {
@@ -822,22 +825,22 @@ const NOMES_PLATAFORMA = {
   mt5: "MetaTrader 5", tradingview: "TradingView", ninjatrader: "NinjaTrader"
 };
 
-async function exportar(destino) {
-  $("#tituloExport").textContent = "Dados para " + (NOMES_PLATAFORMA[destino] || destino);
+async function exportar(ativo, plataforma) {
+  $("#tituloExport").textContent = ativo + " para "
+    + (NOMES_PLATAFORMA[plataforma] || plataforma);
   $("#avisoExport").textContent = "gerando...";
   $("#saidaExport").textContent = "";
   $("#tabelaExport").innerHTML = "";
   $("#modalExport").classList.add("on");
 
-  const d = await textoNiveis(destino);
+  const d = await textoNiveis(ativo, plataforma);
   if (d.erro) {
     $("#avisoExport").textContent = d.erro;
     return;
   }
 
   const i = d.info;
-  const partes = ["ticker " + (i.ticker || "(vazio)"),
-                  "niveis de " + i.indice,
+  const partes = ["niveis de " + i.indice,
                   i.contratos + " contratos",
                   "vencimento " + i.dias + "d"];
   if (i.base === "indice") {
@@ -951,53 +954,87 @@ $("#btResetCores").addEventListener("click", async () => {
 $("#selDias").addEventListener("change", () => {
   $("#status").textContent = "vencimento alterado - clique em atualizar";
 });
-// Qual destino usar: o normal e o MNQ; o USTEC entra so se marcado.
-function destinoAtual() {
-  return $("#chkUstec").checked ? "mt5" : "tradingview";
+function plataformaAtual() {
+  const m = document.querySelector("input[name=plat]:checked");
+  return m ? m.value : "mt5";
 }
 
-function ajustaCaixaUstec() {
-  const usando = $("#chkUstec").checked;
-  $("#caixaUstec").classList.toggle("escondido", !usando);
-  $("#btGerar").textContent = "COPIAR NIVEIS - " + (usando ? "USTEC" : "MNQ");
-  $("#estadoGerar").textContent = "";
+function ativoFoco() {
+  return estado.ultimoAtivo || "MNQ";
 }
 
-$("#chkUstec").addEventListener("change", ajustaCaixaUstec);
-
-$("#btGerar").addEventListener("click", async () => {
-  const bt = $("#btGerar");
-  const estado = $("#estadoGerar");
-  bt.disabled = true;
-  estado.textContent = "gerando...";
+// Clicar no ativo gera a linha e copia na hora, sem passo intermediario.
+async function gerarECopiar(ativo, botao) {
+  const plataforma = plataformaAtual();
+  const estadoTxt = $("#estadoGerar");
+  const antes = botao.textContent;
+  estado.ultimoAtivo = ativo;
+  botao.disabled = true;
+  estadoTxt.textContent = "gerando " + ativo + "...";
   try {
-    const d = await textoNiveis(destinoAtual());
+    const d = await textoNiveis(ativo, plataforma);
     if (d.erro) {
-      estado.textContent = d.erro;
+      estadoTxt.textContent = d.erro;
     } else if (d.vazio) {
-      estado.textContent = "sem niveis - clique em ATUALIZAR REGIOES primeiro";
+      estadoTxt.textContent = "sem niveis - clique em ATUALIZAR REGIOES primeiro";
     } else {
       await navigator.clipboard.writeText(d.corpo);
+      botao.textContent = "COPIADO";
+      botao.classList.add("ok");
+      setTimeout(() => {
+        botao.textContent = antes;
+        botao.classList.remove("ok");
+      }, 1800);
       const i = d.info;
-      estado.textContent = "copiado! " + i.ticker + ", base "
-        + (i.base === "indice" ? "indice" : "futuro")
+      estadoTxt.textContent = i.ativo + " para " + NOMES_PLATAFORMA[i.plataforma]
+        + ", base " + (i.base === "indice" ? "indice" : "futuro")
         + " - cole no indicador";
     }
   } catch (e) {
-    estado.textContent = "falhou: " + e.message;
+    estadoTxt.textContent = "falhou: " + e.message;
   }
-  bt.disabled = false;
+  botao.disabled = false;
+  mostraBaseDoAtivo();
+}
+
+// MNQ e contrato futuro, nao tem ambiguidade. USTEC e US100 sao CFD: a
+// corretora decide se espelham o futuro ou o indice, entao o botao de base
+// vale para esses dois.
+function mostraBaseDoAtivo() {
+  const cfd = (estado.ativos || {}).USTEC || "futuro";
+  pintaBase($("#btBase"), cfd);
+  $("#rotuloBase").textContent = "base dos CFD";
+}
+
+document.querySelectorAll("button.ativo").forEach(b => {
+  b.addEventListener("click", () => gerarECopiar(b.dataset.ativo, b));
 });
 
-$("#btVer").addEventListener("click", () => exportar(destinoAtual()));
-
-document.querySelectorAll("button.base").forEach(b => {
-  b.addEventListener("click", () => {
-    pintaBase(b, b.dataset.valor === "indice" ? "futuro" : "indice");
-    salvaBases();
-    $("#estadoGerar").textContent = "base alterada - gere de novo";
+document.querySelectorAll("input[name=plat]").forEach(r => {
+  r.addEventListener("change", () => {
+    fetch("/api/config", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plataforma: r.value })
+    }).catch(() => { });
+    $("#estadoGerar").textContent = "plataforma: " + NOMES_PLATAFORMA[r.value];
   });
 });
+
+$("#btBase").addEventListener("click", () => {
+  const novo = $("#btBase").dataset.valor === "indice" ? "futuro" : "indice";
+  estado.ativos = estado.ativos || {};
+  estado.ativos.USTEC = novo;
+  estado.ativos.US100 = novo;
+  pintaBase($("#btBase"), novo);
+  fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ativos: { USTEC: novo, US100: novo } })
+  }).catch(() => { });
+  $("#estadoGerar").textContent = "CFD agora na base "
+    + (novo === "indice" ? "indice" : "futuro") + " - gere de novo";
+});
+
+$("#btVer").addEventListener("click", () => exportar(ativoFoco(), plataformaAtual()));
 $("#btCopiar").addEventListener("click", () => {
   navigator.clipboard.writeText($("#saidaExport").textContent);
   $("#btCopiar").textContent = "copiado!";
