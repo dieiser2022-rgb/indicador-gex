@@ -40,6 +40,20 @@ rot_paredes = input.bool(true, "Mostrar rotulo", group = g_pa)
 txt_call = input.string("Call Resistance", "Texto da parede de call", group = g_pa)
 txt_put = input.string("Put Support", "Texto da parede de put", group = g_pa)
 
+g_p2 = "Segunda parede"
+ver_parede2 = input.bool(true, "Mostrar a segunda parede", group = g_p2)
+est_parede2 = input.string("Cheia", "Estilo da linha", options = ["Cheia", "Tracejada", "Pontilhada"], group = g_p2)
+esp_parede2 = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_p2)
+rot_parede2 = input.bool(true, "Mostrar rotulo", group = g_p2)
+
+g_pr = "Ativo irmao (QQQ ou SPY)"
+ver_par = input.bool(true, "Mostrar as paredes do ativo irmao", group = g_pr)
+cor_par = input.color(#a78bfa, "Cor", group = g_pr)
+est_par = input.string("Tracejada", "Estilo da linha", options = ["Cheia", "Tracejada", "Pontilhada"], group = g_pr)
+esp_par = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_pr)
+rot_par = input.bool(true, "Mostrar rotulo", group = g_pr)
+txt_par = input.string("QQQ", "Nome que aparece no rotulo", group = g_pr)
+
 g_hv = "Inversao gama (HVL)"
 cor_hvl = input.color(#fbbf24, "Cor", group = g_hv)
 est_hvl = input.string("Tracejada", "Estilo da linha", options = ["Cheia", "Tracejada", "Pontilhada"], group = g_hv)
@@ -226,6 +240,15 @@ if barstate.islast
             if ver_paredes
                 marcar(parede_call, txt_call, cor_call, estilo_de(est_paredes), esp_paredes, rot_paredes)
                 marcar(parede_put, txt_put, cor_put, estilo_de(est_paredes), esp_paredes, rot_paredes)
+
+            if ver_parede2
+                marcar(buscar("CALLRESISTANCE2"), txt_call + " 2", cor_call, estilo_de(est_parede2), esp_parede2, rot_parede2)
+                marcar(buscar("PUTSUPPORT2"), txt_put + " 2", cor_put, estilo_de(est_parede2), esp_parede2, rot_parede2)
+
+            if ver_par
+                marcar(buscar("PARCALLRESISTANCE"), txt_par + " Call", cor_par, estilo_de(est_par), esp_par, rot_par)
+                marcar(buscar("PARPUTSUPPORT"), txt_par + " Put", cor_par, estilo_de(est_par), esp_par, rot_par)
+                marcar(buscar("PARHVL"), txt_par + " HVL", cor_par, estilo_de(est_par), esp_par, rot_par)
 
             if ver_hvl
                 marcar(buscar("HVL"), txt_hvl, cor_hvl, estilo_de(est_hvl), esp_hvl, rot_hvl)

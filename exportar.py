@@ -15,7 +15,9 @@ import math
 # ordem em que os campos aparecem na linha, igual ao formato original
 ORDEM = [
     "Call Resistance", "Put Support", "HVL", "1D Min", "1D Max",
+    "Call Resistance 2", "Put Support 2",
     "Call Resistance 0DTE", "Put Support 0DTE", "HVL 0DTE", "Gamma Wall 0DTE",
+    "Par Call Resistance", "Par Put Support", "Par HVL",
     "GEX 1", "GEX 2", "GEX 3", "GEX 4", "GEX 5",
     "GEX 6", "GEX 7", "GEX 8", "GEX 9", "GEX 10",
 ]
@@ -91,6 +93,26 @@ def escolher_gex(spot, por_strike, evitar=(), quantos=QUANTOS_GEX,
     return escolhidos
 
 
+def segunda_parede(spot, gex_por_strike, primeira, acima, separacao=SEPARACAO_MINIMA):
+    """A segunda maior concentracao do mesmo lado do preco.
+
+    Serve para ver teto e piso duplos: quando a segunda parede esta logo depois
+    da primeira, a barreira e mais consistente do que um pico isolado.
+    """
+    if not gex_por_strike or not spot or not primeira:
+        return None
+    minimo = spot * separacao
+    candidatos = []
+    for strike, valor in gex_por_strike.items():
+        do_lado = strike > spot if acima else strike < spot
+        se_conta = valor > 0 if acima else valor < 0
+        if do_lado and se_conta and abs(strike - primeira) >= minimo:
+            candidatos.append((strike, abs(valor)))
+    if not candidatos:
+        return None
+    return max(candidatos, key=lambda kv: kv[1])[0]
+
+
 def _niveis_de(G, spot, contratos, com_zero_gamma=True):
     """Calcula paredes, inversao e perfil para um conjunto de contratos."""
     if not contratos:
@@ -103,7 +125,9 @@ def _niveis_de(G, spot, contratos, com_zero_gamma=True):
     # parede de gamma: o strike de maior concentracao em modulo
     muro = max(por_strike.items(), key=lambda kv: abs(kv[1]))[0]
     return {"call_wall": cw, "put_wall": pw, "zero_gamma": zg,
-            "gamma_wall": muro, "por_strike": por_strike}
+            "gamma_wall": muro, "por_strike": por_strike,
+            "call_wall_2": segunda_parede(spot, call_gex, cw, True),
+            "put_wall_2": segunda_parede(spot, put_gex, pw, False)}
 
 
 def calcular(G, dados_cboe, dias_padrao=45, dias_0dte=0):
@@ -153,11 +177,15 @@ def calcular(G, dados_cboe, dias_padrao=45, dias_0dte=0):
     }
 
 
-def montar(ticker, calc, basis=0.0, fator=1.0):
+def montar(ticker, calc, basis=0.0, fator=1.0, par=None):
     """Devolve (linha_pronta, dicionario_de_niveis).
 
     basis e fator convertem do indice para o ativo do grafico: o NQ e o NDX
     mais o basis, e um ETF entra por proporcao.
+
+    par e opcional: os niveis do ativo irmao do mesmo mercado (QQQ junto do
+    NDX, SPY junto do SPX), que entram convertidos por proporcao. Sao
+    aproximados, por isso vao em campos separados.
     """
     if not calc:
         return "", {}
@@ -174,11 +202,22 @@ def montar(ticker, calc, basis=0.0, fator=1.0):
         "HVL": conv(padrao.get("zero_gamma")),
         "1D Min": conv(calc.get("min_dia")),
         "1D Max": conv(calc.get("max_dia")),
+        "Call Resistance 2": conv(padrao.get("call_wall_2")),
+        "Put Support 2": conv(padrao.get("put_wall_2")),
         "Call Resistance 0DTE": conv(hoje.get("call_wall")),
         "Put Support 0DTE": conv(hoje.get("put_wall")),
         "HVL 0DTE": conv(hoje.get("zero_gamma")),
         "Gamma Wall 0DTE": conv(hoje.get("gamma_wall")),
     }
+
+    if par and par.get("spot") and calc.get("spot"):
+        # proporcao entre os dois ativos, mais o basis do futuro
+        escala = calc["spot"] / par["spot"]
+        def conv_par(v):
+            return (v * escala + basis) if v else None
+        valores["Par Call Resistance"] = conv_par(par.get("call_wall"))
+        valores["Par Put Support"] = conv_par(par.get("put_wall"))
+        valores["Par HVL"] = conv_par(par.get("zero_gamma"))
     for i, strike in enumerate(calc.get("gex_top") or [], start=1):
         valores["GEX " + str(i)] = conv(strike)
 

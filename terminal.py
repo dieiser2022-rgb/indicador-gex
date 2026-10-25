@@ -331,7 +331,19 @@ def rota_exportar(args):
         if c and calc["spot"]:
             basis = c["preco"] - calc["spot"]
 
-    linha, valores = exportar.montar(ticker, calc, basis=basis)
+    # Niveis do ativo irmao do mesmo mercado. Aproveita o que o painel ja
+    # calculou em vez de baixar de novo: sao 4 a 13 MB por ativo.
+    nome_par = {"NDX": "QQQ", "SPX": "SPY"}.get(indice)
+    par = None
+    with TRAVA:
+        bruto = CACHE["gamma"].get(nome_par) if nome_par else None
+    if bruto and not bruto.get("erro") and bruto.get("spot"):
+        par = {"nome": nome_par, "spot": bruto["spot"],
+               "call_wall": bruto.get("call_wall"),
+               "put_wall": bruto.get("put_wall"),
+               "zero_gamma": bruto.get("zero_gamma")}
+
+    linha, valores = exportar.montar(ticker, calc, basis=basis, par=par)
 
     with TRAVA:
         CACHE["exportado"] = {"linha": linha, "quando":
@@ -349,6 +361,7 @@ def rota_exportar(args):
         "spot": calc["spot"], "basis": basis, "iv": calc["iv"],
         "contratos": calc["contratos"], "contratos_0dte": calc["contratos_0dte"],
         "dias": dias, "niveis": niveis_para_grafico(simbolo),
+        "par": (par or {}).get("nome", ""),
         "pronto": True, "aviso": aviso,
     }
 
