@@ -20,13 +20,24 @@ CALENDARIO_URLS = [
     "https://nfs.faireconomy.media/ff_calendar_thisweek.xml",
 ]
 
+# Fontes em portugues primeiro: nao precisam de traducao e falam de mercado.
+# As internacionais entram depois e passam pelo tradutor.
+# Evitar feeds "top stories" de portais: eles trazem financas pessoais
+# ("devo vender minha casa?"), que nao servem para operar.
 NOTICIAS_RSS = [
-    ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
-    ("MarketWatch mercados", "https://feeds.content.dowjones.io/public/rss/mw_marketpulse"),
-    ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex"),
-    ("CNBC mercados", "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258"),
-    ("Investing", "https://www.investing.com/rss/news_25.rss"),
+    ("InfoMoney", "https://www.infomoney.com.br/feed/", "pt"),
+    ("InfoMoney mercados", "https://www.infomoney.com.br/mercados/feed/", "pt"),
+    ("Investing BR", "https://br.investing.com/rss/news_25.rss", "pt"),
+    ("Investing BR economia", "https://br.investing.com/rss/news_14.rss", "pt"),
+    ("Money Times", "https://www.moneytimes.com.br/feed/", "pt"),
+    ("MarketWatch mercados", "https://feeds.content.dowjones.io/public/rss/mw_marketpulse", "en"),
+    ("CNBC mercados", "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258", "en"),
+    ("Investing mercados", "https://www.investing.com/rss/news_25.rss", "en"),
 ]
+
+# eventos de calendario que nao servem para nada ao operar
+AGENDA_IGNORAR = ("daylight saving", "horario de verao", "bank holiday",
+                  "holiday", "market holiday", "no data")
 
 # panorama macro usado no morning call
 PAINEL_MACRO = [
@@ -249,8 +260,21 @@ def calendario():
             "previsao": e["previsao"],
             "anterior": e["anterior"],
         })
-    saida.sort(key=lambda x: x["ts"])
-    return saida
+    # tira ruido: mudanca de horario de verao, feriado sem dado, e repetidos
+    limpos = []
+    vistos = set()
+    for e in saida:
+        baixo = e["titulo"].lower()
+        if any(p in baixo for p in AGENDA_IGNORAR):
+            continue
+        chave = (e["titulo"].lower(), e["ts"], e["moeda"])
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        limpos.append(e)
+
+    limpos.sort(key=lambda x: x["ts"])
+    return limpos
 
 
 # ------------------------------------------------------------------- noticias
@@ -291,12 +315,46 @@ def _data_rss(txt):
     return 0
 
 
-def noticias(limite=14):
-    """Manchetes de varias fontes RSS, mais recentes primeiro."""
+_CACHE_TRADUCAO = {}
+
+
+def traduzir(texto, para="pt"):
+    """Traduz usando o endpoint publico do Google Translate.
+
+    Nao e uma API oficial: o Google pode bloquear o trafego sem aviso. Por isso
+    e tratada como enfeite - se falhar, devolve o texto original. A prioridade
+    sao as fontes que ja publicam em portugues.
+    """
+    if not texto or not texto.strip():
+        return texto
+    chave = (texto[:200], para)
+    if chave in _CACHE_TRADUCAO:
+        return _CACHE_TRADUCAO[chave]
+
+    url = ("https://translate.googleapis.com/translate_a/single"
+           "?client=gtx&sl=auto&tl=" + para + "&dt=t&q="
+           + urllib.parse.quote(texto[:1800]))
+    try:
+        bruto = http_get(url, timeout=12)
+        pedacos = json.loads(bruto)[0]
+        saida = "".join(p[0] for p in pedacos if p and p[0])
+        saida = saida.strip() or texto
+    except Exception:
+        saida = texto
+    _CACHE_TRADUCAO[chave] = saida
+    return saida
+
+
+def noticias(limite=14, traduzir_ingles=True):
+    """Manchetes de varias fontes RSS, mais recentes primeiro.
+
+    Os feeds em portugues vem direto. Os em ingles passam pelo tradutor,
+    que e opcional: se cair, o titulo original e mantido.
+    """
     from concurrent.futures import ThreadPoolExecutor
 
     def uma(par):
-        nome, url = par
+        nome, url, idioma = par
         try:
             bruto = http_get(url, timeout=18)
             raiz = ET.fromstring(bruto)
@@ -318,12 +376,13 @@ def noticias(limite=14):
                                        "{http://www.w3.org/2005/Atom}summary"))
             link = pega("link", "guid")
             quando = _data_rss(pega("pubDate", "published", "updated"))
-            itens.append({"fonte": nome, "titulo": titulo,
-                          "resumo": resumo[:400], "link": link, "ts": quando})
+            itens.append({"fonte": nome, "idioma": idioma, "titulo": titulo,
+                          "resumo": resumo[:400], "link": link, "ts": quando,
+                          "traduzido": False})
         return itens
 
     todas = []
-    with ThreadPoolExecutor(max_workers=5) as pool:
+    with ThreadPoolExecutor(max_workers=6) as pool:
         for lista in pool.map(uma, NOTICIAS_RSS):
             todas.extend(lista)
 
@@ -335,4 +394,20 @@ def noticias(limite=14):
             continue
         vistos.add(chave)
         unicas.append(n)
-    return unicas[:limite]
+    unicas = unicas[:limite]
+
+    if traduzir_ingles:
+        pendentes = [n for n in unicas if n.get("idioma") != "pt"]
+        if pendentes:
+            def verte(n):
+                original = n["titulo"]
+                n["titulo"] = traduzir(original)
+                if n["resumo"]:
+                    n["resumo"] = traduzir(n["resumo"])
+                n["traduzido"] = n["titulo"] != original
+                n["original"] = original
+                return n
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                list(pool.map(verte, pendentes))
+
+    return unicas

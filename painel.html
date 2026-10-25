@@ -38,14 +38,22 @@ button:disabled { background: #334155; cursor: wait; }
   display: grid; gap: 12px; padding: 12px 18px 40px;
   grid-template-columns: 300px 1fr 320px;
   grid-template-areas:
-    "agenda regime  dica"
+    "topo   topo    topo"
     "manha  grafico news"
     "cards  cards   cards"
     "export export  export";
 }
+/* a linha de cima e um flex: assim a caixa do GEX fica estreita em vez de
+   esticar junto com o texto do market maker, que e comprido */
+.topo { grid-area: topo; display: flex; gap: 12px; align-items: flex-start; }
+.topo .ag { width: 300px; flex: none; }
+.topo .rg { width: 215px; flex: none; }
+.topo .dc { flex: 1; min-width: 0; }
 @media (max-width: 1250px) {
   .grade { grid-template-columns: 1fr;
-    grid-template-areas: "regime" "dica" "grafico" "agenda" "manha" "news" "cards" "export"; }
+    grid-template-areas: "topo" "grafico" "manha" "news" "cards" "export"; }
+  .topo { flex-wrap: wrap; }
+  .topo .ag, .topo .rg, .topo .dc { width: 100%; }
 }
 .caixa {
   background: var(--painel); border: 1px solid var(--borda);
@@ -55,17 +63,18 @@ button:disabled { background: #334155; cursor: wait; }
   margin: 0 0 10px; font-size: 11px; letter-spacing: 1.5px;
   color: var(--apagado); text-transform: uppercase; font-weight: 600;
 }
-.ag { grid-area: agenda; } .rg { grid-area: regime; }
-.dc { grid-area: dica; }   .gr { grid-area: grafico; }
+.gr { grid-area: grafico; }
 .mn { grid-area: manha; }  .nw { grid-area: news; }
 .cd { grid-area: cards; }  .ex { grid-area: export; }
 
 /* ---------- 2: regime em destaque ---------- */
-.rg { display: flex; flex-direction: column; justify-content: center;
-      align-items: center; text-align: center; }
-#gexValor { font-size: 42px; font-weight: bold; line-height: 1; margin: 4px 0; }
-#gexRegime { font-size: 15px; font-weight: bold; letter-spacing: 2px; }
-#gexAtivo { color: var(--apagado); font-size: 12px; }
+.rg { text-align: center; padding: 14px 12px; }
+#gexValor { font-size: 30px; font-weight: bold; line-height: 1.1; margin: 3px 0; }
+#gexRegime { font-size: 12px; font-weight: bold; letter-spacing: 1.5px; }
+#gexAtivo { color: var(--apagado); font-size: 10.5px; line-height: 1.3; }
+#gexExtra { color: var(--apagado); font-size: 10.5px; margin-top: 8px;
+            padding-top: 7px; border-top: 1px solid var(--borda);
+            display: flex; justify-content: space-between; }
 .positivo { color: var(--alta); } .negativo { color: var(--baixa); }
 
 /* ---------- 1: agenda ---------- */
@@ -112,6 +121,9 @@ button:disabled { background: #334155; cursor: wait; }
 .nt .tl { font-size: 12.5px; line-height: 1.35; }
 .nt .rs { color: var(--apagado); font-size: 11.5px; line-height: 1.4;
           margin-top: 4px; display: none; }
+.nt .trad { background: rgba(56,189,248,.16); color: var(--destaque);
+            font-size: 9px; padding: 1px 5px; border-radius: 8px;
+            margin-left: 6px; }
 .nt.aberta .rs { display: block; }
 .nw { max-height: 520px; overflow-y: auto; }
 
@@ -180,22 +192,25 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
 
 <div class="grade">
 
-  <div class="caixa ag">
-    <h2>1 &middot; Agenda economica</h2>
-    <div id="agenda"><span class="vazio">aguardando...</span></div>
-    <button class="fantasma" id="btAgenda" style="margin-top:8px;width:100%">
-      ver agenda completa</button>
-  </div>
+  <div class="topo">
+    <div class="caixa ag">
+      <h2>1 &middot; Agenda economica</h2>
+      <div id="agenda"><span class="vazio">aguardando...</span></div>
+      <button class="fantasma" id="btAgenda" style="margin-top:8px;width:100%">
+        ver agenda completa</button>
+    </div>
 
-  <div class="caixa rg">
-    <div id="gexAtivo">NDX</div>
-    <div id="gexValor">--</div>
-    <div id="gexRegime">AGUARDANDO</div>
-  </div>
+    <div class="caixa rg">
+      <div id="gexAtivo">NDX</div>
+      <div id="gexValor">--</div>
+      <div id="gexRegime">AGUARDANDO</div>
+      <div id="gexExtra"></div>
+    </div>
 
-  <div class="caixa dc">
-    <h2>3 &middot; Como o market maker tende a agir</h2>
-    <div id="dica"><span class="vazio">aguardando...</span></div>
+    <div class="caixa dc">
+      <h2>3 &middot; Como o market maker tende a agir</h2>
+      <div id="dica"><span class="vazio">aguardando...</span></div>
+    </div>
   </div>
 
   <div class="caixa gr">
@@ -384,6 +399,11 @@ function mostraRegime(d) {
   const rr = $("#gexRegime");
   rr.textContent = "GAMA " + (pos ? "POSITIVO" : "NEGATIVO");
   rr.className = pos ? "positivo" : "negativo";
+  // aproveita o espaco da caixa com o que mais importa junto do regime
+  const dec = d.spot > 2000 ? 0 : 2;
+  $("#gexExtra").innerHTML =
+    "<span>spot " + num(d.spot, dec) + "</span>"
+    + "<span>inversao " + num(d.zero_gamma, dec) + "</span>";
 }
 
 function mostraDica(d) {
@@ -530,9 +550,20 @@ function mostraNoticias(d) {
     const c = el("div", "nt");
     const m = el("div", "meta");
     m.textContent = n.fonte + (n.ts ? "  -  " + dia(n.ts) + " " + hora(n.ts) : "");
+    if (n.traduzido) {
+      const tag = el("span", "trad");
+      tag.textContent = "traduzido";
+      m.appendChild(tag);
+    }
     const t = el("div", "tl"); t.textContent = n.titulo;
     const r = el("div", "rs");
     r.textContent = n.resumo || "(sem resumo)";
+    if (n.traduzido && n.original) {
+      const o = el("div");
+      o.textContent = "original: " + n.original;
+      o.style.cssText = "margin-top:5px;font-style:italic;opacity:.7";
+      r.appendChild(o);
+    }
     if (n.link) {
       const a = el("a");
       a.href = n.link; a.target = "_blank"; a.rel = "noopener";
