@@ -56,6 +56,107 @@ NOTICIAS_BLOQUEAR = (
 AGENDA_IGNORAR = ("daylight saving", "horario de verao", "bank holiday",
                   "holiday", "market holiday", "no data")
 
+# Nomes dos eventos economicos em portugues.
+#
+# Dicionario em vez de tradutor automatico por tres razoes: a lista de eventos
+# e fechada e se repete toda semana, entao cobre quase tudo; os termos sao
+# tecnicos e o tradutor erraria ("Core CPI" nao e "CPI do nucleo do caroco");
+# e funciona sem rede, instantaneo, sem depender de servico de terceiro.
+AGENDA_NOMES = {
+    # inflacao
+    "cpi": "IPC (inflacao ao consumidor)",
+    "core cpi": "IPC nucleo",
+    "ppi": "IPP (inflacao ao produtor)",
+    "core ppi": "IPP nucleo",
+    "pce price index": "Indice de precos PCE",
+    "core pce price index": "Indice PCE nucleo",
+    "cpi flash estimate": "IPC preliminar",
+    # emprego
+    "non-farm employment change": "Criacao de vagas (payroll)",
+    "nonfarm payrolls": "Criacao de vagas (payroll)",
+    "adp non-farm employment change": "Criacao de vagas (ADP)",
+    "unemployment rate": "Taxa de desemprego",
+    "unemployment claims": "Pedidos de auxilio-desemprego",
+    "jobless claims": "Pedidos de auxilio-desemprego",
+    "initial jobless claims": "Pedidos iniciais de auxilio-desemprego",
+    "continuing jobless claims": "Pedidos continuados de auxilio-desemprego",
+    "average hourly earnings": "Rendimento medio por hora",
+    "jolts job openings": "Vagas abertas (JOLTS)",
+    "challenger job cuts": "Cortes de vagas (Challenger)",
+    "employment change": "Variacao do emprego",
+    # juros e banco central
+    "federal funds rate": "Decisao de juros do Fed",
+    "fed interest rate decision": "Decisao de juros do Fed",
+    "fomc statement": "Comunicado do FOMC",
+    "fomc meeting minutes": "Ata do FOMC",
+    "fomc press conference": "Entrevista do FOMC",
+    "fomc member speaks": "Discurso de membro do FOMC",
+    "fed chair powell speaks": "Discurso de Powell (Fed)",
+    "fed chair powell testifies": "Powell no Congresso",
+    "beige book": "Livro Bege do Fed",
+    "main refinancing rate": "Decisao de juros do BCE",
+    "ecb press conference": "Entrevista do BCE",
+    "monetary policy statement": "Comunicado de politica monetaria",
+    "official bank rate": "Decisao de juros do BoE",
+    "boj policy rate": "Decisao de juros do BoJ",
+    # atividade
+    "gdp": "PIB",
+    "gdp growth rate": "Crescimento do PIB",
+    "prelim gdp": "PIB preliminar",
+    "final gdp": "PIB final",
+    "retail sales": "Vendas no varejo",
+    "core retail sales": "Vendas no varejo nucleo",
+    "industrial production": "Producao industrial",
+    "capacity utilization rate": "Uso da capacidade industrial",
+    "factory orders": "Pedidos a industria",
+    "durable goods orders": "Pedidos de bens duraveis",
+    "core durable goods orders": "Pedidos de bens duraveis nucleo",
+    "trade balance": "Balanca comercial",
+    "current account": "Conta corrente",
+    # pesquisas e indices
+    "ism manufacturing pmi": "PMI industrial (ISM)",
+    "ism services pmi": "PMI de servicos (ISM)",
+    "flash manufacturing pmi": "PMI industrial preliminar",
+    "flash services pmi": "PMI de servicos preliminar",
+    "manufacturing pmi": "PMI industrial",
+    "services pmi": "PMI de servicos",
+    "composite pmi": "PMI composto",
+    "consumer confidence": "Confianca do consumidor",
+    "cb consumer confidence": "Confianca do consumidor (CB)",
+    "consumer sentiment": "Sentimento do consumidor",
+    "prelim um consumer sentiment": "Sentimento do consumidor (Michigan)",
+    "empire state manufacturing index": "Indice industrial de Nova York",
+    "philly fed manufacturing index": "Indice industrial da Filadelfia",
+    "chicago pmi": "PMI de Chicago",
+    "zew economic sentiment": "Sentimento economico (ZEW)",
+    "ifo business climate": "Clima de negocios (Ifo)",
+    # imoveis
+    "building permits": "Alvaras de construcao",
+    "housing starts": "Inicio de construcoes",
+    "existing home sales": "Venda de casas usadas",
+    "new home sales": "Venda de casas novas",
+    "pending home sales": "Vendas pendentes de casas",
+    "case shiller home price index": "Indice de precos de casas (Case-Shiller)",
+    # energia e tesouro
+    "crude oil inventories": "Estoques de petroleo",
+    "natural gas storage": "Estoques de gas natural",
+    "10-y bond auction": "Leilao de titulos de 10 anos",
+    "30-y bond auction": "Leilao de titulos de 30 anos",
+    "treasury currency report": "Relatorio cambial do Tesouro",
+}
+
+# sufixos e marcadores que aparecem colados no nome do evento
+AGENDA_SUFIXOS = [
+    (" m/m", " mensal"), (" q/q", " trimestral"), (" y/y", " anual"),
+    (" mom", " mensal"), (" qoq", " trimestral"), (" yoy", " anual"),
+    (" (qoq)", " trimestral"), (" (yoy)", " anual"), (" (mom)", " mensal"),
+]
+AGENDA_PREFIXOS = [
+    ("flash ", "preliminar: "), ("prelim ", "preliminar: "),
+    ("preliminary ", "preliminar: "), ("final ", "final: "),
+    ("revised ", "revisado: "), ("core ", "nucleo "),
+]
+
 # panorama macro usado no morning call
 PAINEL_MACRO = [
     ("NQ=F", "Nasdaq fut"),
@@ -288,6 +389,11 @@ def calendario():
         if chave in vistos:
             continue
         vistos.add(chave)
+        # guarda o nome original: o dicionario pode nao cobrir um evento novo,
+        # e ai da para ver o que faltou traduzir
+        e["original"] = e["titulo"]
+        e["titulo"] = nome_evento(e["titulo"])
+        e["traduzido"] = e["titulo"] != e["original"]
         limpos.append(e)
 
     limpos.sort(key=lambda x: x["ts"])
@@ -409,6 +515,50 @@ def relevancia(titulo, resumo=""):
     if any(p in texto for p in PESO_MEDIO):
         return 2
     return 1
+
+
+def nome_evento(titulo):
+    """Nome do evento economico em portugues.
+
+    Tenta na ordem: o nome inteiro no dicionario, depois o nome sem o sufixo
+    de periodo, depois o nucleo da frase sem prefixos. Se nada bater, devolve
+    o original - nome em ingles e melhor do que traducao errada de termo
+    tecnico.
+    """
+    if not titulo:
+        return titulo
+    bruto = " ".join(titulo.split())
+    baixo = bruto.lower()
+
+    if baixo in AGENDA_NOMES:
+        return AGENDA_NOMES[baixo]
+
+    # separa o sufixo de periodo: "CPI m/m" -> "cpi" + " mensal"
+    sufixo = ""
+    for de, para in AGENDA_SUFIXOS:
+        if baixo.endswith(de):
+            baixo = baixo[:-len(de)].strip()
+            sufixo = para
+            break
+
+    if baixo in AGENDA_NOMES:
+        return AGENDA_NOMES[baixo] + sufixo
+
+    # separa o prefixo: "Flash Manufacturing PMI" -> "preliminar: " + resto
+    prefixo = ""
+    for de, para in AGENDA_PREFIXOS:
+        if baixo.startswith(de):
+            resto = baixo[len(de):].strip()
+            if resto in AGENDA_NOMES:
+                return para + AGENDA_NOMES[resto] + sufixo
+            prefixo = para
+            baixo = resto
+            break
+
+    if baixo in AGENDA_NOMES:
+        return prefixo + AGENDA_NOMES[baixo] + sufixo
+
+    return bruto
 
 
 def noticias(limite=14, traduzir_ingles=True):

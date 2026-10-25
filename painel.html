@@ -772,7 +772,8 @@ function linhaEvento(e, passou) {
   const h = el("span", "hora"); h.textContent = hora(e.ts);
   const t = el("span", "tit");
   t.textContent = (e.moeda ? e.moeda + " " : "") + e.titulo;
-  t.title = e.titulo;
+  // o nome original fica na dica, para conferir contra outros calendarios
+  t.title = e.titulo + (e.traduzido ? "\n(" + e.original + ")" : "");
   const v = el("span", "vals");
   const partes = [];
   if (e.previsao) partes.push("prev " + e.previsao);
@@ -803,9 +804,11 @@ function mostraAgenda(d) {
     const peso = e.peso || 0;
     const tr = el("tr", "imp" + peso);
     if (e.ts <= d.agora) tr.style.opacity = ".45";
+    const dica = e.traduzido ? ' title="' + e.original + '"' : "";
     tr.innerHTML = "<td></td><td>" + dia(e.ts) + "</td><td>" + hora(e.ts)
-      + "</td><td>" + (e.moeda || "") + "</td><td>" + e.titulo + "</td><td>"
-      + (e.previsao || "") + "</td><td>" + (e.anterior || "") + "</td>";
+      + "</td><td>" + (e.moeda || "") + "</td><td" + dica + ">" + e.titulo
+      + "</td><td>" + (e.previsao || "") + "</td><td>"
+      + (e.anterior || "") + "</td>";
     tr.firstChild.appendChild(bolinhas(peso));
     tb.appendChild(tr);
   });
