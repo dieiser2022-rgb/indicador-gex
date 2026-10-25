@@ -335,12 +335,29 @@ def _data_rss(txt):
 _CACHE_TRADUCAO = {}
 
 
-def traduzir(texto, para="pt"):
-    """Traduz usando o endpoint publico do Google Translate.
+def _traduz_google(texto, para):
+    url = ("https://translate.googleapis.com/translate_a/single"
+           "?client=gtx&sl=auto&tl=" + para + "&dt=t&q="
+           + urllib.parse.quote(texto[:1800]))
+    pedacos = json.loads(http_get(url, timeout=12))[0]
+    return "".join(p[0] for p in pedacos if p and p[0]).strip()
 
-    Nao e uma API oficial: o Google pode bloquear o trafego sem aviso. Por isso
-    e tratada como enfeite - se falhar, devolve o texto original. A prioridade
-    sao as fontes que ja publicam em portugues.
+
+def _traduz_mymemory(texto, para):
+    # reserva: API publica, sem chave, com limite diario para anonimo
+    alvo = "pt-br" if para == "pt" else para
+    url = ("https://api.mymemory.translated.net/get?langpair=en|" + alvo
+           + "&q=" + urllib.parse.quote(texto[:480]))
+    d = json.loads(http_get(url, timeout=12))
+    return (d.get("responseData") or {}).get("translatedText", "").strip()
+
+
+def traduzir(texto, para="pt"):
+    """Traduz com dois servicos em sequencia, cada um sem chave de API.
+
+    Nenhum dos dois e contratado, entao qualquer um pode recusar o pedido a
+    qualquer momento. Se os dois falharem, devolve o texto original - melhor a
+    manchete em ingles do que manchete nenhuma.
     """
     if not texto or not texto.strip():
         return texto
@@ -348,18 +365,50 @@ def traduzir(texto, para="pt"):
     if chave in _CACHE_TRADUCAO:
         return _CACHE_TRADUCAO[chave]
 
-    url = ("https://translate.googleapis.com/translate_a/single"
-           "?client=gtx&sl=auto&tl=" + para + "&dt=t&q="
-           + urllib.parse.quote(texto[:1800]))
-    try:
-        bruto = http_get(url, timeout=12)
-        pedacos = json.loads(bruto)[0]
-        saida = "".join(p[0] for p in pedacos if p and p[0])
-        saida = saida.strip() or texto
-    except Exception:
-        saida = texto
+    saida = ""
+    for tentativa in (_traduz_google, _traduz_mymemory):
+        try:
+            saida = tentativa(texto, para)
+            if saida and saida.lower() != texto.lower():
+                break
+        except Exception:
+            saida = ""
+    saida = saida or texto
     _CACHE_TRADUCAO[chave] = saida
     return saida
+
+
+# ------------------------------------------------------------- relevancia
+# Peso 3: mexe com o indice inteiro. Peso 2: mexe com um setor ou uma empresa
+# grande. O resto fica em 1. A busca e feita no titulo em portugues, entao os
+# termos aparecem nas duas linguas onde faz diferenca.
+PESO_ALTO = (
+    "fed", "fomc", "powell", "juros", "taxa de juros", "inflacao", "inflação",
+    "cpi", "ipca", "payroll", "desemprego", "pib", "gdp", "recessao",
+    "recessão", "tarifa", "tarifas", "guerra", "ataque", "sancao", "sanção",
+    "banco central", "copom", "selic", "treasury", "titulos do tesouro",
+    "rebaixa", "rating", "crise", "circuit breaker", "nasdaq", "s&p 500",
+    "dolar dispara", "dólar dispara", "petroleo dispara", "petróleo dispara",
+)
+PESO_MEDIO = (
+    "nvidia", "apple", "microsoft", "tesla", "amazon", "alphabet", "google",
+    "meta", "broadcom", "amd", "intel", "balanco", "balanço", "resultado",
+    "lucro", "prejuizo", "prejuízo", "receita", "guidance", "dividendo",
+    "ipo", "fusao", "fusão", "aquisicao", "aquisição", "ibovespa",
+    "petrobras", "vale", "itau", "itaú", "bitcoin", "ouro", "petroleo",
+    "petróleo", "semicondutor", "inteligencia artificial",
+    "inteligência artificial",
+)
+
+
+def relevancia(titulo, resumo=""):
+    """Devolve 3, 2 ou 1 conforme o alcance do assunto."""
+    texto = (titulo + " " + (resumo or "")).lower()
+    if any(p in texto for p in PESO_ALTO):
+        return 3
+    if any(p in texto for p in PESO_MEDIO):
+        return 2
+    return 1
 
 
 def noticias(limite=14, traduzir_ingles=True):
@@ -429,5 +478,12 @@ def noticias(limite=14, traduzir_ingles=True):
                 return n
             with ThreadPoolExecutor(max_workers=4) as pool:
                 list(pool.map(verte, pendentes))
+
+    # Classifica depois de traduzir, para os termos serem encontrados no
+    # titulo em portugues. Em seguida ordena por peso e, dentro do mesmo
+    # peso, pelo mais recente - assim o que move o indice sobe para o topo.
+    for n in unicas:
+        n["peso"] = relevancia(n["titulo"], n.get("resumo"))
+    unicas.sort(key=lambda n: (n["peso"], n["ts"]), reverse=True)
 
     return unicas
