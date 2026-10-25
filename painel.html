@@ -166,12 +166,24 @@ button:disabled { background: #334155; cursor: wait; }
 /* ---------- 9: exportar ---------- */
 .ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
              margin-top: 8px; display: block; }
-.expLinha { display: flex; gap: 6px; margin-bottom: 7px; }
-.expLinha button.ger { flex: 1; min-width: 0; padding: 9px 8px; font-size: 12px;
-                       text-align: left; }
-.expLinha button.cop { width: 40px; flex: none; padding: 9px 0;
-                       background: transparent; border: 1px solid var(--borda);
-                       color: var(--apagado); font-size: 11px; }
+/* tres colunas alinhadas: plataforma | ticker | copiar */
+.expLinha { display: grid; grid-template-columns: 1fr 74px 46px; gap: 5px;
+            margin-bottom: 6px; }
+.expLinha > * { height: 34px; }
+.expLinha button.ger { min-width: 0; padding: 0 10px; font-size: 12px;
+                       text-align: left; overflow: hidden;
+                       text-overflow: ellipsis; white-space: nowrap; }
+.expLinha input.tick { background: var(--fundo); color: var(--texto);
+                       border: 1px solid var(--borda); border-radius: 8px;
+                       padding: 0 6px; font-family: inherit; font-size: 11.5px;
+                       text-align: center; text-transform: uppercase;
+                       min-width: 0; }
+.expLinha input.tick:focus { outline: 0; border-color: var(--destaque); }
+.expLinha input.tick::placeholder { color: var(--apagado); opacity: .55;
+                                    text-transform: none; }
+.expLinha button.cop { padding: 0; background: transparent;
+                       border: 1px solid var(--borda);
+                       color: var(--apagado); font-size: 10.5px; }
 .expLinha button.cop:hover { color: var(--texto); border-color: var(--destaque); }
 .expLinha button.cop.ok { color: var(--alta); border-color: var(--alta); }
 
@@ -234,18 +246,25 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
       <h2>9 &middot; Gerar GEX</h2>
       <div class="expLinha">
         <button class="ger" data-destino="mt5">MetaTrader 5</button>
+        <input class="tick" data-tick="mt5" placeholder="USTEC"
+               title="como a plataforma chama o Nasdaq" spellcheck="false">
         <button class="cop" data-copia="mt5" title="copiar os niveis">copiar</button>
       </div>
       <div class="expLinha">
         <button class="ger" data-destino="tradingview">TradingView</button>
+        <input class="tick" data-tick="tradingview" placeholder="US100"
+               title="como a plataforma chama o Nasdaq" spellcheck="false">
         <button class="cop" data-copia="tradingview" title="copiar os niveis">copiar</button>
       </div>
       <div class="expLinha">
         <button class="ger" data-destino="ninjatrader">NinjaTrader</button>
+        <input class="tick" data-tick="ninjatrader" placeholder="NQ"
+               title="como a plataforma chama o Nasdaq" spellcheck="false">
         <button class="cop" data-copia="ninjatrader" title="copiar os niveis">copiar</button>
       </div>
-      <span class="aviso">Por enquanto abre os niveis em texto.
-        O arquivo de cada plataforma ainda nao foi feito.</span>
+      <span class="aviso">O campo do meio e o nome do ativo na plataforma
+        (cada corretora usa um). Por enquanto os botoes abrem os niveis em
+        texto - o arquivo de cada plataforma ainda nao foi feito.</span>
     </div>
   </div>
 
@@ -732,7 +751,27 @@ async function carregaConfig() {
     aplicaCores(estado.cores);
     if (cfg.dias_max) $("#selDias").value = String(cfg.dias_max);
     if (cfg.grafico) $("#selAtivo").value = cfg.grafico;
+    const tk = cfg.tickers || {};
+    document.querySelectorAll("input.tick").forEach(i => {
+      if (tk[i.dataset.tick]) i.value = tk[i.dataset.tick];
+    });
   } catch (e) { }
+}
+
+let aguardaTicker = null;
+function salvaTickers() {
+  clearTimeout(aguardaTicker);
+  // espera o usuario parar de digitar antes de gravar
+  aguardaTicker = setTimeout(() => {
+    const tickers = {};
+    document.querySelectorAll("input.tick").forEach(i => {
+      tickers[i.dataset.tick] = i.value.trim().toUpperCase();
+    });
+    fetch("/api/config", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tickers: tickers })
+    }).catch(() => { });
+  }, 600);
 }
 function aplicaCores(cores) {
   for (const k in cores) {
@@ -767,9 +806,11 @@ async function textoNiveis(destino) {
     + "&simbolo=" + encodeURIComponent(simbolo));
   const linhas = (d.niveis || []).map(n =>
     n.rotulo.padEnd(22) + num(n.preco, 2) + (n.exato ? "" : "   (aproximado)"));
+  const cabeca = (d.ticker ? d.ticker : simbolo) + "  -  "
+    + new Date().toLocaleString("pt-BR")
+    + (d.ticker ? "   (niveis de " + simbolo + ")" : "");
   const corpo = linhas.length
-    ? (simbolo + "  -  " + new Date().toLocaleString("pt-BR") + "\n\n"
-       + linhas.join("\n"))
+    ? (cabeca + "\n\n" + linhas.join("\n"))
     : "sem niveis calculados ainda - clique em ATUALIZAR REGIOES primeiro";
   return { corpo: corpo, aviso: d.aviso || "", vazio: !linhas.length };
 }
@@ -887,6 +928,9 @@ document.querySelectorAll(".ex button[data-destino]").forEach(b => {
 });
 document.querySelectorAll(".ex button[data-copia]").forEach(b => {
   b.addEventListener("click", () => copiarNiveis(b.dataset.copia, b));
+});
+document.querySelectorAll("input.tick").forEach(i => {
+  i.addEventListener("input", salvaTickers);
 });
 $("#btCopiar").addEventListener("click", () => {
   navigator.clipboard.writeText($("#saidaExport").textContent);

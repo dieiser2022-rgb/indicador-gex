@@ -78,17 +78,28 @@ TRAVA = threading.Lock()
 
 # ------------------------------------------------------------------- config
 
-    # cores usadas antes da troca: call vermelho e put verde
+# cores usadas antes da troca: call vermelho e put verde
 CORES_ANTIGAS = {"call_wall": "#f87171", "put_wall": "#4ade80"}
+
+# Cada corretora chama o mesmo ativo de um jeito. Estes sao apenas sugestoes
+# iniciais - o usuario ajusta no painel conforme a plataforma dele.
+TICKERS_PADRAO = {
+    "mt5": "USTEC",
+    "tradingview": "US100",
+    "ninjatrader": "NQ",
+}
 
 
 def ler_config():
-    cfg = {"cores": dict(CORES_PADRAO), "dias_max": 45, "grafico": GRAFICO_PADRAO}
+    cfg = {"cores": dict(CORES_PADRAO), "tickers": dict(TICKERS_PADRAO),
+           "dias_max": 45, "grafico": GRAFICO_PADRAO}
     if os.path.exists(CONFIG):
         try:
             salvo = json.loads(open(CONFIG, encoding="utf-8").read())
             if isinstance(salvo.get("cores"), dict):
                 cfg["cores"].update(salvo["cores"])
+            if isinstance(salvo.get("tickers"), dict):
+                cfg["tickers"].update(salvo["tickers"])
             for chave in ("dias_max", "grafico"):
                 if chave in salvo:
                     cfg[chave] = salvo[chave]
@@ -113,6 +124,10 @@ def gravar_config(novo):
     if isinstance(novo.get("cores"), dict):
         cfg["cores"].update({k: v for k, v in novo["cores"].items()
                              if k in CORES_PADRAO})
+    if isinstance(novo.get("tickers"), dict):
+        cfg["tickers"].update({k: str(v).strip().upper()[:24]
+                               for k, v in novo["tickers"].items()
+                               if k in TICKERS_PADRAO})
     if "dias_max" in novo:
         try:
             cfg["dias_max"] = max(0, int(novo["dias_max"]))
@@ -293,8 +308,9 @@ def rota_exportar(args):
     destino = (args.get("destino") or ["texto"])[0]
     simbolo = (args.get("simbolo") or [GRAFICO_PADRAO])[0]
     niveis = niveis_para_grafico(simbolo)
-    return {"destino": destino, "simbolo": simbolo, "niveis": niveis,
-            "pronto": False,
+    ticker = ler_config()["tickers"].get(destino, "")
+    return {"destino": destino, "simbolo": simbolo, "ticker": ticker,
+            "niveis": niveis, "pronto": False,
             "aviso": "Exportacao ainda nao implementada - so o layout."}
 
 
