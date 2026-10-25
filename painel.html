@@ -268,14 +268,35 @@ button:disabled { background: #334155; cursor: wait; filter: none;
 .topo .ag { width: 290px; flex: none; }
 .topo .rg { width: 200px; flex: none; }
 .topo .dc { flex: 1; min-width: 0; }
-.topo .rb { width: 240px; flex: none; }
+.topo .jr { width: 270px; flex: none; }
+.topo .rb { width: 210px; flex: none; }
 .topo .ex { width: 268px; flex: none; }
 @media (max-width: 1250px) {
   .grade { grid-template-columns: 1fr;
     grid-template-areas: "topo" "grafico" "manha" "news"; }
   .topo { flex-wrap: wrap; }
-  .topo .ag, .topo .rg, .topo .dc, .topo .rb, .topo .ex { width: 100%; }
+  .topo .ag, .topo .rg, .topo .dc, .topo .jr, .topo .rb,
+  .topo .ex { width: 100%; }
 }
+
+/* ---------- juros de 10 anos ---------- */
+.jr { display: flex; flex-direction: column; }
+.jr h2 select {
+  margin-left: auto; background: var(--fundo); color: var(--apagado);
+  border: 1px solid var(--borda); border-radius: 6px; padding: 2px 5px;
+  font-family: inherit; font-size: 9.5px; text-transform: none;
+  letter-spacing: 0;
+}
+.jrTopo { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+#jrAtual { font-size: 26px; font-weight: 800; font-family: var(--mono);
+           line-height: 1.1; }
+#jrVar { font-size: 11px; font-weight: 700; font-family: var(--mono); }
+#svgJuros { width: 100%; height: 92px; display: block; }
+.jrPe { display: flex; justify-content: space-between; gap: 6px;
+        color: var(--apagado); font-size: 9.5px; font-family: var(--mono);
+        margin-top: 2px; }
+#jrNota { text-align: center; font-family: "Segoe UI", sans-serif;
+          font-size: 9.5px; letter-spacing: .2px; }
 .caixa {
   background-color: var(--painel);
   /* leve brilho de cima para baixo, por cima da cor escolhida */
@@ -563,6 +584,27 @@ table.cal tr:hover { background: rgba(148,163,184,.05); }
     <div class="caixa dc">
       <h2>3 &middot; Como o market maker tende a agir</h2>
       <div id="dica"><span class="vazio">aguardando...</span></div>
+    </div>
+
+    <div class="caixa jr">
+      <h2>Juros 10 anos EUA
+        <select id="selJuros">
+          <option value="1mo">1 mes</option>
+          <option value="3mo" selected>3 meses</option>
+          <option value="6mo">6 meses</option>
+          <option value="1y">1 ano</option>
+        </select>
+      </h2>
+      <div class="jrTopo">
+        <span id="jrAtual">--</span>
+        <span id="jrVar"></span>
+      </div>
+      <svg id="svgJuros" viewBox="0 0 300 92" preserveAspectRatio="none"></svg>
+      <div class="jrPe">
+        <span id="jrMin">min --</span>
+        <span id="jrNota"></span>
+        <span id="jrMax">max --</span>
+      </div>
     </div>
 
     <div class="caixa rb">
@@ -1084,6 +1126,96 @@ function getCor(nome) {
     .getPropertyValue("--" + nome).trim() || "#888";
 }
 
+/* ---------------------------------------------------- juros 10 anos */
+function desenhaJuros(d) {
+  const svg = $("#svgJuros");
+  svg.innerHTML = "";
+  const pts = (d && d.pontos) || [];
+  if (pts.length < 2) {
+    svg.innerHTML = '<text x="150" y="48" fill="#94a3b8" font-size="11"'
+      + ' text-anchor="middle">sem dados de juros</text>';
+    return;
+  }
+  const L = 2, R = 298, T = 8, B = 84;
+  let min = Math.min(...pts.map(p => p.v));
+  let max = Math.max(...pts.map(p => p.v));
+  const folga = (max - min) * 0.12 || 0.05;
+  min -= folga; max += folga;
+  const x = i => L + (R - L) * i / (pts.length - 1);
+  const y = v => B - (v - min) / (max - min) * (B - T);
+
+  const ns = "http://www.w3.org/2000/svg";
+  const add = (tag, attrs) => {
+    const n = document.createElementNS(ns, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    svg.appendChild(n);
+    return n;
+  };
+
+  // sobe ou desce no periodo decide a cor: juro em alta pressiona a bolsa
+  const subiu = pts[pts.length - 1].v >= pts[0].v;
+  const cor = subiu ? getCor("baixa") : getCor("alta");
+
+  // area preenchida embaixo da linha, com degrade
+  const grad = document.createElementNS(ns, "linearGradient");
+  grad.setAttribute("id", "gradJuros");
+  grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
+  grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
+  grad.innerHTML = '<stop offset="0" stop-color="' + cor
+    + '" stop-opacity=".35"/><stop offset="1" stop-color="' + cor
+    + '" stop-opacity="0"/>';
+  svg.appendChild(grad);
+
+  let linha = "";
+  pts.forEach((p, i) => {
+    linha += (i ? " L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1);
+  });
+  add("path", { d: linha + " L" + R + " " + B + " L" + L + " " + B + " Z",
+                fill: "url(#gradJuros)" });
+  add("path", { d: linha, fill: "none", stroke: cor, "stroke-width": 1.8,
+                "stroke-linejoin": "round" });
+
+  // ponto e linha no valor atual
+  const ultimo = pts[pts.length - 1];
+  add("line", { x1: L, y1: y(ultimo.v), x2: R, y2: y(ultimo.v), stroke: cor,
+                "stroke-width": .8, "stroke-dasharray": "2 3", opacity: .45 });
+  add("circle", { cx: x(pts.length - 1), cy: y(ultimo.v), r: 3, fill: cor });
+}
+
+async function carregaJuros() {
+  const janela = $("#selJuros").value;
+  try {
+    const d = await pega("/api/juros?janela=" + janela);
+    if (d.erro) {
+      $("#jrAtual").textContent = "--";
+      $("#jrNota").textContent = d.erro;
+      desenhaJuros(null);
+      return d;
+    }
+    estado.juros = d;
+    const subiu = d.variacao >= 0;
+    $("#jrAtual").textContent = num(d.atual, 3) + "%";
+    $("#jrAtual").className = subiu ? "negativo" : "positivo";
+    $("#jrVar").textContent = (subiu ? "+" : "") + num(d.variacao, 3)
+      + " no dia";
+    $("#jrVar").className = subiu ? "negativo" : "positivo";
+    $("#jrMin").textContent = "min " + num(d.minimo, 2);
+    $("#jrMax").textContent = "max " + num(d.maximo, 2);
+    // leitura de mecanica, nao de direcao: juro alto encarece o futuro das
+    // empresas de tecnologia, que e o peso do Nasdaq
+    const noPeriodo = d.atual - d.primeiro;
+    $("#jrNota").textContent = Math.abs(noPeriodo) < 0.03
+      ? "estavel no periodo"
+      : (noPeriodo > 0 ? "em alta: pressiona tech" : "em queda: alivia tech");
+    desenhaJuros(d);
+    piscar($("#jrAtual"));
+    return d;
+  } catch (e) {
+    $("#jrNota").textContent = "falhou: " + e.message;
+    return null;
+  }
+}
+
 /* ---------------------------------------------------- 6: noticias */
 function mostraNoticias(d) {
   const alvo = $("#noticias"); alvo.innerHTML = "";
@@ -1360,6 +1492,7 @@ async function atualizarTudo() {
   passos.push(["agenda", async () => {
     const d = await pega("/api/calendario"); mostraAgenda(d); return d;
   }]);
+  passos.push(["juros 10 anos", carregaJuros]);
   passos.push(["noticias", async () => {
     const d = await pega("/api/noticias"); mostraNoticias(d); return d;
   }]);
@@ -1448,6 +1581,7 @@ $("#btResetCores").addEventListener("click", async () => {
 ["selAtivo", "selIntervalo", "selJanela"].forEach(id => {
   $("#" + id).addEventListener("change", carregaGrafico);
 });
+$("#selJuros").addEventListener("change", carregaJuros);
 $("#selDias").addEventListener("change", () => {
   $("#status").textContent = "vencimento alterado - clique em atualizar";
 });
@@ -1559,6 +1693,7 @@ window.addEventListener("resize", () => {
   clearTimeout(aguardaResize);
   aguardaResize = setTimeout(() => {
     if (estado.grafico) desenhaGrafico(estado.grafico);
+    if (estado.juros) desenhaJuros(estado.juros);
   }, 120);
 });
 

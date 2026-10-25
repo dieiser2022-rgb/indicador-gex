@@ -306,6 +306,34 @@ def rota_panorama(args):
     return {"panorama": p}
 
 
+def rota_juros(args):
+    """Historico do rendimento do Treasury de 10 anos."""
+    janela = (args.get("janela") or ["3mo"])[0]
+    velas = fontes.candles("^TNX", "1d", janela)
+    if not velas:
+        return {"erro": "nao foi possivel buscar o juro de 10 anos"}
+
+    # O ^TNX as vezes vem multiplicado por dez (41.2 em vez de 4.12). Juro de
+    # dez anos nao chega a 20% em condicao normal, entao acima disso divide.
+    escala = 0.1 if velas[-1]["c"] > 20 else 1.0
+    pontos = [{"t": v["t"], "v": round(v["c"] * escala, 4)} for v in velas]
+
+    atual = pontos[-1]["v"]
+    anterior = pontos[-2]["v"] if len(pontos) > 1 else atual
+    valores = [p["v"] for p in pontos]
+
+    with TRAVA:
+        CACHE["juros"] = pontos
+
+    return {
+        "simbolo": "^TNX", "nome": "Treasury 10 anos", "janela": janela,
+        "pontos": pontos, "atual": atual,
+        "variacao": round(atual - anterior, 4),
+        "minimo": min(valores), "maximo": max(valores),
+        "primeiro": valores[0],
+    }
+
+
 def rota_morningcall(args):
     with TRAVA:
         gammas = [CACHE["gamma"].get(a[0]) for a in ATIVOS]
@@ -400,6 +428,7 @@ ROTAS = {
     "/api/calendario": rota_calendario,
     "/api/noticias": rota_noticias,
     "/api/panorama": rota_panorama,
+    "/api/juros": rota_juros,
     "/api/morningcall": rota_morningcall,
     "/api/exportar": rota_exportar,
 }
