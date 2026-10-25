@@ -168,12 +168,16 @@ button:disabled { background: #334155; cursor: wait; }
          gap: 6px; flex-wrap: wrap; }
 /* com quatro opcoes o espaco fica justo: deixa quebrar para a linha de baixo
    em vez de espremer ou cortar */
-.atalhos { display: flex; gap: 9px; flex-wrap: wrap; }
-.atalhos label { display: flex; align-items: center; gap: 3px; cursor: pointer;
-                 font-size: 10px; letter-spacing: .3px; color: var(--apagado);
-                 white-space: nowrap; }
-.atalhos label:hover { color: var(--texto); }
-.atalhos input { accent-color: var(--destaque); margin: 0; cursor: pointer; }
+/* A base de preco e a unica escolha que muda os numeros, entao fica em
+   destaque. O nome do ativo e so etiqueta e vive no campo de cada linha. */
+.baseGeral { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; }
+.baseGeral .rot { color: var(--apagado); font-size: 10px; letter-spacing: 1px;
+                  text-transform: uppercase; margin-right: auto; }
+.baseGeral button { padding: 6px 12px; font-size: 10.5px; font-weight: bold;
+                    letter-spacing: .5px; background: transparent;
+                    border: 1px solid var(--borda); color: var(--apagado); }
+.baseGeral button.ativo { background: var(--botao); color: #fff;
+                          border-color: var(--botao); }
 .ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
              margin-top: 8px; display: block; }
 /* quatro colunas alinhadas: plataforma | ticker | base | copiar */
@@ -260,15 +264,14 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
     </div>
 
     <div class="caixa ex">
-      <h2>9 &middot; Gerar GEX
-        <span class="atalhos">
-          <label><input type="radio" name="tkbase" value="USTEC"> USTEC</label>
-          <label><input type="radio" name="tkbase" value="US100"> US100</label>
-          <label><input type="radio" name="tkbase" value="NQ"> NQ</label>
-          <label><input type="radio" name="tkbase" value="MNQ"> MNQ</label>
-          <label><input type="radio" name="tkbase" value="NQ1!"> NQ1!</label>
-        </span>
-      </h2>
+      <h2>9 &middot; Gerar GEX</h2>
+      <div class="baseGeral">
+        <span class="rot">Base de preco</span>
+        <button data-tudo="futuro" title="NQ, MNQ, NQ1! e a maioria dos CFD">
+          FUTURO</button>
+        <button data-tudo="indice" title="alguns CFD seguem o indice a vista">
+          INDICE</button>
+      </div>
       <div class="expLinha">
         <button class="ger" data-destino="mt5">MetaTrader 5</button>
         <input class="tick" data-tick="mt5" placeholder="USTEC"
@@ -293,10 +296,10 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
                 title="a plataforma cota o futuro ou o indice a vista?">FUT</button>
         <button class="cop" data-copia="ninjatrader" title="copiar os niveis">copiar</button>
       </div>
-      <span class="aviso">No meio, o nome do ativo na plataforma. Depois,
-        <b>FUT</b> ou <b>IDX</b>: se a plataforma cota o futuro ou o indice a
-        vista. Clique para alternar - a diferenca passa de 200 pontos no
-        Nasdaq.</span>
+      <span class="aviso">O nome e so etiqueta: <b>NQ</b>, <b>MNQ</b> e
+        <b>NQ1!</b> dao os mesmos numeros. O que muda os valores e a base -
+        <b>FUT</b> ou <b>IDX</b> -, porque entre futuro e indice ha mais de
+        200 pontos de diferenca no Nasdaq.</span>
     </div>
   </div>
 
@@ -795,13 +798,7 @@ async function carregaConfig() {
     document.querySelectorAll("button.base").forEach(b => {
       pintaBase(b, bs[b.dataset.base] || "futuro");
     });
-    // se os tres campos tem o mesmo nome, marca a opcao rapida correspondente
-    const valores = [...document.querySelectorAll("input.tick")]
-      .map(i => i.value.trim().toUpperCase());
-    const todosIguais = valores.every(v => v && v === valores[0]);
-    document.querySelectorAll("input[name=tkbase]").forEach(r => {
-      r.checked = todosIguais && r.value === valores[0];
-    });
+    marcaBaseGeral();
   } catch (e) { }
 }
 
@@ -826,6 +823,17 @@ function pintaBase(botao, valor) {
   botao.classList.toggle("fut", valor !== "indice");
   botao.classList.toggle("idx", valor === "indice");
   botao.dataset.valor = valor;
+}
+
+// O botao grande fica aceso so quando as tres linhas concordam; se uma for
+// diferente, nenhum dos dois acende, deixando claro que ha excecao.
+function marcaBaseGeral() {
+  const valores = [...document.querySelectorAll("button.base")]
+    .map(b => b.dataset.valor || "futuro");
+  const todas = valores.every(v => v === valores[0]) ? valores[0] : "";
+  document.querySelectorAll(".baseGeral button").forEach(b => {
+    b.classList.toggle("ativo", b.dataset.tudo === todas);
+  });
 }
 
 function salvaBases() {
@@ -1033,24 +1041,23 @@ document.querySelectorAll(".ex button[data-copia]").forEach(b => {
   b.addEventListener("click", () => copiarNiveis(b.dataset.copia, b));
 });
 document.querySelectorAll("input.tick").forEach(i => {
-  i.addEventListener("input", () => {
-    // digitar a mao desmarca as opcoes rapidas
-    document.querySelectorAll("input[name=tkbase]").forEach(r => r.checked = false);
-    salvaTickers();
-  });
+  i.addEventListener("input", salvaTickers);
 });
 document.querySelectorAll("button.base").forEach(b => {
   b.addEventListener("click", () => {
     pintaBase(b, b.dataset.valor === "indice" ? "futuro" : "indice");
+    marcaBaseGeral();
     salvaBases();
   });
 });
-document.querySelectorAll("input[name=tkbase]").forEach(r => {
-  r.addEventListener("change", () => {
-    if (!r.checked) return;
-    // preenche os tres campos de uma vez com o nome escolhido
-    document.querySelectorAll("input.tick").forEach(i => { i.value = r.value; });
-    salvaTickers();
+document.querySelectorAll(".baseGeral button").forEach(b => {
+  b.addEventListener("click", () => {
+    // troca a base das tres plataformas de uma vez
+    document.querySelectorAll("button.base").forEach(x => {
+      pintaBase(x, b.dataset.tudo);
+    });
+    marcaBaseGeral();
+    salvaBases();
   });
 });
 $("#btCopiar").addEventListener("click", () => {
