@@ -1,0 +1,98 @@
+# indicador-gex
+
+Terminal local de níveis de gamma (GEX) para índices e futuros americanos.
+Calcula os níveis a partir da cadeia de opções da CBOE, sem depender de nenhum
+site de terceiros e sem precisar de login, cadastro ou chave de API.
+
+Roda inteiro com a biblioteca padrão do Python. **Não há nada para instalar.**
+
+## O que ele mostra
+
+Para NDX, SPX, QQQ e SPY:
+
+- **Spot** — preço atual do índice
+- **Inversão gama** (zero gamma) — o preço onde o regime vira
+- **Parede de call** — maior concentração de gamma de call acima do preço
+- **Parede de put** — maior concentração de gamma de put abaixo do preço
+- **GEX líquido** — tamanho da posição de gamma dos dealers, por 1% de movimento
+- **Regime** — positivo (dealers estabilizam) ou negativo (dealers amplificam)
+
+Para NQ e ES, os mesmos níveis convertidos do índice para o preço do futuro,
+usando o basis calculado automaticamente.
+
+## Como usar
+
+```bash
+python terminal.py
+```
+
+Abre o navegador em `http://localhost:8777`. Clique em **ATUALIZAR REGIOES**.
+A primeira carga leva de 40 a 60 segundos (o arquivo do SPX tem 13 MB).
+
+Para ver só um ativo no terminal, em texto:
+
+```bash
+python gamma_cboe.py
+```
+
+Para acumular histórico a cada 15 minutos, em horário de mercado:
+
+```bash
+python agendador.py
+```
+
+## Arquivos
+
+| Arquivo | Função |
+|---|---|
+| `gamma_cboe.py` | baixa a CBOE e calcula os níveis; grava `gamma.csv` |
+| `terminal.py` | servidor local e interface web |
+| `agendador.py` | coleta periódica dentro do horário de mercado |
+| `testar_candles.py` | verifica quais fontes de candles respondem |
+| `ESTADO.md` | estado do projeto, decisões tomadas e pendências |
+| `legado/` | primeiras tentativas, raspando um site de terceiros (abandonado) |
+
+## Fontes de dados
+
+- **Opções:** CBOE, arquivo público `delayed_quotes` (atraso de ~15 minutos).
+  Traz gamma, open interest e volatilidade implícita por contrato.
+- **Preço de futuros e candles:** Yahoo Finance, endpoint v8 de chart.
+
+Nenhuma das duas exige chave ou cadastro.
+
+## Como os níveis são calculados
+
+O strike não vem como campo separado: está codificado no nome do contrato, no
+padrão OSI (`SPY261023C00500000` = SPY, vencimento 23/10/2026, call, strike 500).
+
+Para cada contrato com open interest, o gamma em dólares é
+`gamma × open interest × 100 × spot² × 0,01`, positivo para call e negativo para
+put. Os valores são somados por strike.
+
+A **inversão gama** não sai de uma soma simples: o programa simula o índice em
+81 preços diferentes, recalcula o gamma de toda a carteira em cada um, e acha
+onde o total troca de sinal.
+
+Quando a CBOE não envia o gamma de um contrato, ele é calculado por
+Black-Scholes a partir da volatilidade implícita. Contratos já vencidos são
+descartados, porque o gamma de uma opção no dia do vencimento distorce o total.
+
+## Validação
+
+Comparado com um serviço comercial de referência em 23/10/2026 (SPX):
+
+| Campo | Calculado aqui | Referência |
+|---|---|---|
+| Spot | 7623,68 | 7624 |
+| Inversão gama | 7730,06 | 7737 |
+| Parede de call | 8000,00 | 8000 |
+| GEX líquido | −51,14 B | −50,98 B |
+
+O basis calculado (ES = SPX + 48,82 e NQ = NDX + 217,47) também coincidiu com
+os valores da referência.
+
+## Aviso
+
+Ferramenta de análise para uso pessoal. Os números descrevem a mecânica de
+hedge dos dealers — não são previsão de preço nem recomendação de investimento.
+Dados com atraso, não servem para execução.

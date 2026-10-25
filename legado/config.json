@@ -1,0 +1,32 @@
+{
+  "modo": "pagina",
+  "url_pagina": "https://www.gexmetrix.com/gamma_dashboard",
+  "url_api": "",
+  "metodo_api": "GET",
+  "headers_api": {},
+  "api_via_navegador": true,
+  "espera_segundos": 25,
+  "headless": true,
+  "rotulos": [
+    "Gamma Flip",
+    "Zero Gamma",
+    "Flip Point",
+    "Call Wall",
+    "Put Wall",
+    "Net GEX",
+    "Total Gamma",
+    "Total GEX",
+    "Net Gamma",
+    "Spot",
+    "Spot Price",
+    "Last Price",
+    "Price",
+    "Max Pain",
+    "Max Gamma",
+    "Regime",
+    "Support",
+    "Resistance",
+    "Upper Bound",
+    "Lower Bound"
+  ]
+}

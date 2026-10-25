@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+
+# dados gerados pela coleta
+gamma.csv
+leituras.csv
+leituras.db
+pagina.txt
+pagina.html
+tela.png
+resumo.txt
+estado.json
+brutos/
+amostras/
+dados/
+coleta.log
