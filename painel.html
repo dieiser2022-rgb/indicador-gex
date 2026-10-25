@@ -176,9 +176,16 @@ button:disabled { background: #334155; cursor: wait; }
 .atalhos input { accent-color: var(--destaque); margin: 0; cursor: pointer; }
 .ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
              margin-top: 8px; display: block; }
-/* tres colunas alinhadas: plataforma | ticker | copiar */
-.expLinha { display: grid; grid-template-columns: 1fr 74px 46px; gap: 5px;
+/* quatro colunas alinhadas: plataforma | ticker | base | copiar */
+.expLinha { display: grid; grid-template-columns: 1fr 62px 38px 44px; gap: 4px;
             margin-bottom: 6px; }
+.expLinha button.base { padding: 0; background: transparent;
+                        border: 1px solid var(--borda); color: var(--apagado);
+                        font-size: 9.5px; font-weight: bold; }
+.expLinha button.base.fut { color: var(--destaque);
+                            border-color: var(--destaque); }
+.expLinha button.base.idx { color: var(--inversao);
+                            border-color: var(--inversao); }
 .expLinha > * { height: 34px; }
 .expLinha button.ger { min-width: 0; padding: 0 10px; font-size: 12px;
                        text-align: left; overflow: hidden;
@@ -266,23 +273,30 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
         <button class="ger" data-destino="mt5">MetaTrader 5</button>
         <input class="tick" data-tick="mt5" placeholder="USTEC"
                title="como a plataforma chama o Nasdaq" spellcheck="false">
+        <button class="base" data-base="mt5"
+                title="a plataforma cota o futuro ou o indice a vista?">FUT</button>
         <button class="cop" data-copia="mt5" title="copiar os niveis">copiar</button>
       </div>
       <div class="expLinha">
         <button class="ger" data-destino="tradingview">TradingView</button>
         <input class="tick" data-tick="tradingview" placeholder="US100"
                title="como a plataforma chama o Nasdaq" spellcheck="false">
+        <button class="base" data-base="tradingview"
+                title="a plataforma cota o futuro ou o indice a vista?">FUT</button>
         <button class="cop" data-copia="tradingview" title="copiar os niveis">copiar</button>
       </div>
       <div class="expLinha">
         <button class="ger" data-destino="ninjatrader">NinjaTrader</button>
         <input class="tick" data-tick="ninjatrader" placeholder="NQ"
                title="como a plataforma chama o Nasdaq" spellcheck="false">
+        <button class="base" data-base="ninjatrader"
+                title="a plataforma cota o futuro ou o indice a vista?">FUT</button>
         <button class="cop" data-copia="ninjatrader" title="copiar os niveis">copiar</button>
       </div>
-      <span class="aviso">O campo do meio e o nome do ativo na plataforma
-        (cada corretora usa um). Por enquanto os botoes abrem os niveis em
-        texto - o arquivo de cada plataforma ainda nao foi feito.</span>
+      <span class="aviso">No meio, o nome do ativo na plataforma. Depois,
+        <b>FUT</b> ou <b>IDX</b>: se a plataforma cota o futuro ou o indice a
+        vista. Clique para alternar - a diferenca passa de 200 pontos no
+        Nasdaq.</span>
     </div>
   </div>
 
@@ -777,6 +791,10 @@ async function carregaConfig() {
     document.querySelectorAll("input.tick").forEach(i => {
       if (tk[i.dataset.tick]) i.value = tk[i.dataset.tick];
     });
+    const bs = cfg.bases || {};
+    document.querySelectorAll("button.base").forEach(b => {
+      pintaBase(b, bs[b.dataset.base] || "futuro");
+    });
     // se os tres campos tem o mesmo nome, marca a opcao rapida correspondente
     const valores = [...document.querySelectorAll("input.tick")]
       .map(i => i.value.trim().toUpperCase());
@@ -801,6 +819,24 @@ function salvaTickers() {
       body: JSON.stringify({ tickers: tickers })
     }).catch(() => { });
   }, 600);
+}
+
+function pintaBase(botao, valor) {
+  botao.textContent = valor === "indice" ? "IDX" : "FUT";
+  botao.classList.toggle("fut", valor !== "indice");
+  botao.classList.toggle("idx", valor === "indice");
+  botao.dataset.valor = valor;
+}
+
+function salvaBases() {
+  const bases = {};
+  document.querySelectorAll("button.base").forEach(b => {
+    bases[b.dataset.base] = b.dataset.valor || "futuro";
+  });
+  fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bases: bases })
+  }).catch(() => { });
 }
 function aplicaCores(cores) {
   for (const k in cores) {
@@ -863,7 +899,12 @@ async function exportar(destino) {
                   "niveis de " + i.indice,
                   i.contratos + " contratos",
                   "vencimento " + i.dias + "d"];
-  if (i.basis) partes.push("basis " + num(i.basis, 2));
+  if (i.base === "indice") {
+    partes.push("base: INDICE a vista (" + num(i.spot, 2) + ", sem basis)");
+  } else if (i.preco_futuro) {
+    partes.push("base: FUTURO (" + num(i.preco_futuro, 2)
+                + ", basis " + num(i.basis, 2) + ")");
+  }
   if (i.contratos_0dte) partes.push(i.contratos_0dte + " contratos 0DTE");
   $("#avisoExport").textContent = partes.join("  -  ")
     + (d.aviso ? "   |   " + d.aviso : "");
@@ -996,6 +1037,12 @@ document.querySelectorAll("input.tick").forEach(i => {
     // digitar a mao desmarca as opcoes rapidas
     document.querySelectorAll("input[name=tkbase]").forEach(r => r.checked = false);
     salvaTickers();
+  });
+});
+document.querySelectorAll("button.base").forEach(b => {
+  b.addEventListener("click", () => {
+    pintaBase(b, b.dataset.valor === "indice" ? "futuro" : "indice");
+    salvaBases();
   });
 });
 document.querySelectorAll("input[name=tkbase]").forEach(r => {

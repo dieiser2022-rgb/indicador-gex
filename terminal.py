@@ -90,9 +90,20 @@ TICKERS_PADRAO = {
     "ninjatrader": "NQ",
 }
 
+# Em que preco a plataforma cota o ativo: no futuro ou no indice a vista.
+# Importa porque a diferenca entre os dois (o basis) passa de 200 pontos no
+# Nasdaq - usar a base errada desloca todos os niveis de uma vez.
+# NQ, MNQ e NQ1! seguem o futuro. CFDs como USTEC dependem da corretora.
+BASES_PADRAO = {
+    "mt5": "futuro",
+    "tradingview": "futuro",
+    "ninjatrader": "futuro",
+}
+
 
 def ler_config():
     cfg = {"cores": dict(CORES_PADRAO), "tickers": dict(TICKERS_PADRAO),
+           "bases": dict(BASES_PADRAO),
            "dias_max": 45, "grafico": GRAFICO_PADRAO}
     if os.path.exists(CONFIG):
         try:
@@ -101,6 +112,10 @@ def ler_config():
                 cfg["cores"].update(salvo["cores"])
             if isinstance(salvo.get("tickers"), dict):
                 cfg["tickers"].update(salvo["tickers"])
+            if isinstance(salvo.get("bases"), dict):
+                cfg["bases"].update({k: v for k, v in salvo["bases"].items()
+                                     if k in BASES_PADRAO
+                                     and v in ("futuro", "indice")})
             for chave in ("dias_max", "grafico"):
                 if chave in salvo:
                     cfg[chave] = salvo[chave]
@@ -129,6 +144,10 @@ def gravar_config(novo):
         cfg["tickers"].update({k: str(v).strip().upper()[:24]
                                for k, v in novo["tickers"].items()
                                if k in TICKERS_PADRAO})
+    if isinstance(novo.get("bases"), dict):
+        cfg["bases"].update({k: v for k, v in novo["bases"].items()
+                             if k in BASES_PADRAO
+                             and v in ("futuro", "indice")})
     if "dias_max" in novo:
         try:
             cfg["dias_max"] = max(0, int(novo["dias_max"]))
@@ -325,11 +344,17 @@ def rota_exportar(args):
         return {"destino": destino,
                 "erro": "sem contratos usaveis para " + indice}
 
+    # Base de preco da plataforma de destino. Quem cota o indice a vista nao
+    # leva o basis; quem cota o futuro leva.
+    base = cfg["bases"].get(destino, "futuro")
     basis = 0.0
+    preco_futuro = None
     if simbolo.endswith("=F"):
         c = fontes.cotacao(simbolo)
         if c and calc["spot"]:
-            basis = c["preco"] - calc["spot"]
+            preco_futuro = c["preco"]
+            if base == "futuro":
+                basis = c["preco"] - calc["spot"]
 
     # Niveis do ativo irmao do mesmo mercado. Aproveita o que o painel ja
     # calculou em vez de baixar de novo: sao 4 a 13 MB por ativo.
@@ -359,6 +384,7 @@ def rota_exportar(args):
         "destino": destino, "simbolo": simbolo, "indice": indice,
         "ticker": ticker, "linha": linha, "valores": valores,
         "spot": calc["spot"], "basis": basis, "iv": calc["iv"],
+        "base": base, "preco_futuro": preco_futuro,
         "contratos": calc["contratos"], "contratos_0dte": calc["contratos_0dte"],
         "dias": dias, "niveis": niveis_para_grafico(simbolo),
         "par": (par or {}).get("nome", ""),
