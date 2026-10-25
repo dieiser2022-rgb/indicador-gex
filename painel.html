@@ -39,8 +39,7 @@ button:disabled { background: #334155; cursor: wait; }
   grid-template-columns: 300px 1fr 320px;
   grid-template-areas:
     "topo   topo    topo"
-    "manha  grafico news"
-    "cards  cards   cards";
+    "manha  grafico news";
 }
 /* a linha de cima e um flex: assim a caixa do GEX fica estreita em vez de
    esticar junto com o texto do market maker, que e comprido */
@@ -51,7 +50,7 @@ button:disabled { background: #334155; cursor: wait; }
 .topo .ex { width: 268px; flex: none; }
 @media (max-width: 1250px) {
   .grade { grid-template-columns: 1fr;
-    grid-template-areas: "topo" "grafico" "manha" "news" "cards"; }
+    grid-template-areas: "topo" "grafico" "manha" "news"; }
   .topo { flex-wrap: wrap; }
   .topo .ag, .topo .rg, .topo .dc, .topo .ex { width: 100%; }
 }
@@ -65,7 +64,7 @@ button:disabled { background: #334155; cursor: wait; }
 }
 .gr { grid-area: grafico; }
 .mn { grid-area: manha; }  .nw { grid-area: news; }
-.cd { grid-area: cards; }  .ex { grid-area: export; }
+
 
 /* ---------- 2: regime em destaque ---------- */
 .rg { text-align: center; padding: 14px 12px; }
@@ -108,7 +107,7 @@ button:disabled { background: #334155; cursor: wait; }
   background: var(--fundo); color: var(--texto); border: 1px solid var(--borda);
   border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 12px;
 }
-#svgGrafico { width: 100%; height: 440px; display: block; }
+#svgGrafico { width: 100%; height: 560px; display: block; }
 .legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px;
            color: var(--apagado); margin-top: 4px; }
 .legenda i { display: inline-block; width: 12px; height: 3px;
@@ -125,14 +124,14 @@ button:disabled { background: #334155; cursor: wait; }
             font-size: 9px; padding: 1px 5px; border-radius: 8px;
             margin-left: 6px; }
 .nt.aberta .rs { display: block; }
-.nw { max-height: 520px; overflow-y: auto; }
+.nw { max-height: 620px; overflow-y: auto; }
 
 /* ---------- 7: morning call ---------- */
 .mc { margin-bottom: 9px; }
 .mc .t { color: var(--destaque); font-size: 10.5px; letter-spacing: 1px;
          text-transform: uppercase; margin-bottom: 2px; }
 .mc .v { font-size: 12.5px; line-height: 1.4; }
-.mn { max-height: 520px; overflow-y: auto; }
+.mn { max-height: 620px; overflow-y: auto; }
 
 /* ---------- 8: cards ---------- */
 .cards { display: grid; gap: 10px;
@@ -194,6 +193,7 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
 <header>
   <h1>TERMINAL GEX</h1>
   <button id="atualizar">ATUALIZAR REGIOES</button>
+  <button class="fantasma" id="btNiveis">niveis</button>
   <button class="fantasma" id="btCores">cores</button>
   <span id="status">clique em atualizar</span>
 </header>
@@ -266,7 +266,7 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
       </select>
       <span id="infoGrafico" class="vazio"></span>
     </div>
-    <svg id="svgGrafico" viewBox="0 0 1000 440" preserveAspectRatio="none"></svg>
+    <svg id="svgGrafico" viewBox="0 0 1000 560" preserveAspectRatio="none"></svg>
     <div class="legenda">
       <span><i style="background:var(--call_wall)"></i>parede de call</span>
       <span><i style="background:var(--put_wall)"></i>parede de put</span>
@@ -285,11 +285,6 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
     <div id="morning"><span class="vazio">aguardando...</span></div>
   </div>
 
-  <div class="caixa cd">
-    <h2>8 &middot; Niveis por ativo</h2>
-    <div class="cards" id="cards"><span class="vazio">aguardando...</span></div>
-  </div>
-
 </div>
 
 <div class="modal" id="modalCal">
@@ -299,6 +294,18 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
       <button class="fantasma" data-fecha="modalCal">fechar</button>
     </div>
     <div id="calCompleto" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<div class="modal" id="modalNiveis">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Niveis por ativo</h2>
+      <button class="fantasma" data-fecha="modalNiveis">fechar</button>
+    </div>
+    <div class="cards" id="cards" style="margin-top:12px">
+      <span class="vazio">aguardando...</span>
+    </div>
   </div>
 </div>
 
@@ -448,12 +455,12 @@ function desenhaGrafico(dados) {
   const velas = (dados && dados.candles) || [];
   const niveis = (dados && dados.niveis) || [];
   if (!velas.length) {
-    svg.innerHTML = '<text x="500" y="220" fill="#94a3b8" font-size="14"'
+    svg.innerHTML = '<text x="500" y="280" fill="#94a3b8" font-size="14"'
       + ' text-anchor="middle">sem candles para mostrar</text>';
     return;
   }
 
-  const L = 8, R = 760, T = 14, B = 410;   // area dos candles
+  const L = 8, R = 760, T = 14, B = 528;   // area dos candles
   const PX = 790, PR = 935;                // area do perfil de gamma
   let min = Infinity, max = -Infinity;
   velas.forEach(v => { min = Math.min(min, v.l); max = Math.max(max, v.h); });
@@ -815,6 +822,7 @@ async function atualizarTudo() {
 /* ---------------------------------------------------- eventos */
 $("#atualizar").addEventListener("click", atualizarTudo);
 $("#btAgenda").addEventListener("click", () => $("#modalCal").classList.add("on"));
+$("#btNiveis").addEventListener("click", () => $("#modalNiveis").classList.add("on"));
 $("#btCores").addEventListener("click", () => {
   montaEditorCores(); $("#modalCores").classList.add("on");
 });
