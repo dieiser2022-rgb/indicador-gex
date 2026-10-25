@@ -82,14 +82,6 @@ TRAVA = threading.Lock()
 # cores usadas antes da troca: call vermelho e put verde
 CORES_ANTIGAS = {"call_wall": "#f87171", "put_wall": "#4ade80"}
 
-# Cada corretora chama o mesmo ativo de um jeito. Estes sao apenas sugestoes
-# iniciais - o usuario ajusta no painel conforme a plataforma dele.
-TICKERS_PADRAO = {
-    "mt5": "USTEC",
-    "tradingview": "MNQ",
-    "ninjatrader": "MNQ",
-}
-
 # Em que preco cada ativo e cotado: no futuro ou no indice a vista. Importa
 # porque a diferenca (o basis) passa de 200 pontos no Nasdaq - usar a base
 # errada desloca todos os niveis de uma vez.
