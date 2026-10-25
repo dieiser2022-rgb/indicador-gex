@@ -13,14 +13,16 @@
   --destaque: #38bdf8; --botao: #2563eb;
 }
 * { box-sizing: border-box; }
+html, body { height: 100%; }
 body {
   margin: 0; background: var(--fundo); color: var(--texto);
   font-family: "Segoe UI", Arial, sans-serif; font-size: 14px;
+  display: flex; flex-direction: column; overflow: hidden;
 }
 header {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 12px 18px; border-bottom: 1px solid var(--borda);
-  position: sticky; top: 0; background: var(--fundo); z-index: 20;
+  background: var(--fundo); flex: none;
 }
 h1 { margin: 0; font-size: 17px; letter-spacing: 2px; }
 button {
@@ -34,16 +36,23 @@ button:disabled { background: #334155; cursor: wait; }
             color: var(--apagado); }
 #status { color: var(--apagado); font-size: 13px; margin-left: auto; }
 
+/* a grade ocupa toda a altura que sobra da janela: a linha de cima fica do
+   tamanho do conteudo e a de baixo (grafico, morning call, noticias) estica */
 .grade {
-  display: grid; gap: 12px; padding: 12px 18px 40px;
+  display: grid; gap: 12px; padding: 12px 18px;
   grid-template-columns: 300px 1fr 320px;
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     "topo   topo    topo"
     "manha  grafico news";
+  flex: 1; min-height: 0;
 }
+.grade > .caixa, .grade > .topo { min-height: 0; }
 /* a linha de cima e um flex: assim a caixa do GEX fica estreita em vez de
    esticar junto com o texto do market maker, que e comprido */
-.topo { grid-area: topo; display: flex; gap: 12px; align-items: flex-start; }
+.topo { grid-area: topo; display: flex; gap: 12px; align-items: stretch;
+        max-height: 34vh; }
+.topo .caixa { overflow-y: auto; }
 .topo .ag { width: 290px; flex: none; }
 .topo .rg { width: 200px; flex: none; }
 .topo .dc { flex: 1; min-width: 0; }
@@ -100,14 +109,14 @@ button:disabled { background: #334155; cursor: wait; }
           margin-top: 8px; }
 
 /* ---------- 4 e 5: grafico ---------- */
-.gr { padding: 8px; }
+.gr { padding: 8px; display: flex; flex-direction: column; min-height: 0; }
 .barraTopo { display: flex; gap: 8px; align-items: center; margin-bottom: 6px;
              flex-wrap: wrap; }
 .barraTopo select, .barraTopo input {
   background: var(--fundo); color: var(--texto); border: 1px solid var(--borda);
   border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 12px;
 }
-#svgGrafico { width: 100%; height: 560px; display: block; }
+#svgGrafico { width: 100%; flex: 1; min-height: 0; display: block; }
 .legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px;
            color: var(--apagado); margin-top: 4px; }
 .legenda i { display: inline-block; width: 12px; height: 3px;
@@ -124,14 +133,14 @@ button:disabled { background: #334155; cursor: wait; }
             font-size: 9px; padding: 1px 5px; border-radius: 8px;
             margin-left: 6px; }
 .nt.aberta .rs { display: block; }
-.nw { max-height: 620px; overflow-y: auto; }
+.nw { overflow-y: auto; }
 
 /* ---------- 7: morning call ---------- */
 .mc { margin-bottom: 9px; }
 .mc .t { color: var(--destaque); font-size: 10.5px; letter-spacing: 1px;
          text-transform: uppercase; margin-bottom: 2px; }
 .mc .v { font-size: 12.5px; line-height: 1.4; }
-.mn { max-height: 620px; overflow-y: auto; }
+.mn { overflow-y: auto; }
 
 /* ---------- 8: cards ---------- */
 .cards { display: grid; gap: 10px;
@@ -266,7 +275,7 @@ pre.saida { background: var(--fundo); border: 1px solid var(--borda);
       </select>
       <span id="infoGrafico" class="vazio"></span>
     </div>
-    <svg id="svgGrafico" viewBox="0 0 1000 560" preserveAspectRatio="none"></svg>
+    <svg id="svgGrafico"></svg>
     <div class="legenda">
       <span><i style="background:var(--call_wall)"></i>parede de call</span>
       <span><i style="background:var(--put_wall)"></i>parede de put</span>
@@ -455,13 +464,25 @@ function desenhaGrafico(dados) {
   const velas = (dados && dados.candles) || [];
   const niveis = (dados && dados.niveis) || [];
   if (!velas.length) {
-    svg.innerHTML = '<text x="500" y="280" fill="#94a3b8" font-size="14"'
+    const c = svg.getBoundingClientRect();
+    svg.innerHTML = '<text x="' + ((c.width || 900) / 2) + '" y="'
+      + ((c.height || 400) / 2) + '" fill="#94a3b8" font-size="14"'
       + ' text-anchor="middle">sem candles para mostrar</text>';
     return;
   }
 
-  const L = 8, R = 760, T = 14, B = 528;   // area dos candles
-  const PX = 790, PR = 935;                // area do perfil de gamma
+  // Desenha no tamanho real do elemento, nao num espaco fixo. Assim o
+  // viewBox bate 1 para 1 com os pixels e nada estica quando a janela muda.
+  const caixa = svg.getBoundingClientRect();
+  const W = Math.max(caixa.width || svg.clientWidth || 900, 420);
+  const H = Math.max(caixa.height || svg.clientHeight || 420, 240);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+  const L = 8, T = 14;
+  const B = H - 26;                  // sobra para o eixo do tempo
+  const R = W - 235;                 // candles
+  const LBL = R + 4;                 // rotulos de preco
+  const PX = W - 182, PR = W - 45;   // perfil de gamma
   let min = Infinity, max = -Infinity;
   velas.forEach(v => { min = Math.min(min, v.l); max = Math.max(max, v.h); });
   niveis.forEach(n => {
@@ -487,7 +508,7 @@ function desenhaGrafico(dados) {
     const p = min + (max - min) * i / 4;
     add("line", { x1: L, y1: y(p), x2: R, y2: y(p),
                   stroke: "rgba(148,163,184,.12)", "stroke-width": 1 });
-    add("text", { x: R + 4, y: y(p) + 4, fill: "#94a3b8", "font-size": 10 },
+    add("text", { x: LBL, y: y(p) + 4, fill: "#94a3b8", "font-size": 10 },
         num(p, p > 2000 ? 0 : 2));
   }
 
@@ -873,8 +894,14 @@ $("#btCopiar").addEventListener("click", () => {
   $("#btCopiar").textContent = "copiado!";
   setTimeout(() => $("#btCopiar").textContent = "copiar", 1500);
 });
+// redesenha quando a janela muda de tamanho, com uma pausa para nao
+// recalcular a cada pixel durante o arrasto
+let aguardaResize = null;
 window.addEventListener("resize", () => {
-  if (estado.grafico) desenhaGrafico(estado.grafico);
+  clearTimeout(aguardaResize);
+  aguardaResize = setTimeout(() => {
+    if (estado.grafico) desenhaGrafico(estado.grafico);
+  }, 120);
 });
 
 carregaConfig().then(atualizarTudo);
