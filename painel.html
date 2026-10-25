@@ -88,6 +88,76 @@ button:disabled { background: #334155; cursor: wait; filter: none;
 }
 .pulso { animation: pulso .7s ease-out; }
 
+/* ---------- o robozinho do cabecalho ----------
+   Decoracao com uma funcao: ele muda de jeito conforme o painel trabalha,
+   entao serve de sinal de atividade. Tudo em SVG e CSS, sem imagem nem
+   biblioteca - some junto com o resto se o navegador for leve. */
+#robo { flex: none; overflow: visible; animation: flutua 3.4s ease-in-out infinite; }
+#robo .cabeca {
+  fill: var(--painel); stroke: var(--destaque); stroke-width: 1.6;
+  filter: drop-shadow(0 0 7px rgba(56,189,248,.45));
+}
+#robo .orelha { fill: var(--borda); stroke: var(--destaque); stroke-width: 1; }
+#robo .haste { stroke: var(--destaque); stroke-width: 1.6; }
+#robo .luz {
+  fill: var(--destaque);
+  filter: drop-shadow(0 0 6px var(--destaque));
+  animation: brilhaLuz 2.2s ease-in-out infinite;
+}
+#robo .olho {
+  fill: var(--destaque); transform-origin: center;
+  animation: piscaOlho 5s ease-in-out infinite;
+}
+#robo .boca { fill: none; stroke: var(--destaque); stroke-width: 1.5;
+              stroke-linecap: round; opacity: .75; }
+
+@keyframes flutua {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2.5px); }
+}
+@keyframes brilhaLuz {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: 1; }
+}
+/* piscada rapida, so de vez em quando */
+@keyframes piscaOlho {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94%           { transform: scaleY(.12); }
+}
+
+/* trabalhando: olhos viram fenda e a luz acelera */
+#robo.pensando .luz { animation-duration: .6s; }
+#robo.pensando .olho { animation: olhoFenda 1.1s ease-in-out infinite; }
+#robo.pensando { animation-duration: 1.4s; }
+@keyframes olhoFenda {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(.3); }
+}
+
+/* terminou: um aceno de cabeca e a cor vai para o verde por um instante */
+#robo.feliz .cabeca, #robo.feliz .haste, #robo.feliz .orelha {
+  stroke: var(--alta);
+}
+#robo.feliz .luz, #robo.feliz .olho { fill: var(--alta); }
+#robo.feliz .boca { stroke: var(--alta); }
+#robo.feliz { animation: acena .7s ease-in-out; }
+@keyframes acena {
+  0%, 100% { transform: rotate(0); }
+  25%      { transform: rotate(-9deg); }
+  75%      { transform: rotate(9deg); }
+}
+
+/* deu problema: a luz fica vermelha e a boca virada para baixo */
+#robo.triste .cabeca, #robo.triste .haste, #robo.triste .orelha {
+  stroke: var(--baixa);
+}
+#robo.triste .luz, #robo.triste .olho { fill: var(--baixa); }
+/* vira a boca para baixo girando o traco, em vez de trocar o desenho:
+   mudar 'd' por CSS nao funciona em todo navegador */
+#robo.triste .boca { stroke: var(--baixa); transform: rotate(180deg);
+                     transform-origin: 24px 31.5px; }
+#robo.triste { animation: none; }
+
 /* a grade ocupa toda a altura que sobra da janela: a linha de cima fica do
    tamanho do conteudo e a de baixo (grafico, morning call, noticias) estica */
 .grade {
@@ -342,6 +412,19 @@ table.cal tr:hover { background: rgba(148,163,184,.05); }
 <body>
 
 <header>
+  <svg id="robo" viewBox="0 0 48 44" width="36" height="33"
+       title="o robo trabalha enquanto o painel busca os dados">
+    <line class="haste" x1="24" y1="11" x2="24" y2="5"/>
+    <circle class="luz" cx="24" cy="4" r="2.6"/>
+    <rect class="orelha" x="3" y="19" width="3.4" height="9" rx="1.7"/>
+    <rect class="orelha" x="41.6" y="19" width="3.4" height="9" rx="1.7"/>
+    <rect class="cabeca" x="8" y="11" width="32" height="27" rx="9"/>
+    <g class="olhos">
+      <circle class="olho" cx="18" cy="23" r="3.6"/>
+      <circle class="olho" cx="30" cy="23" r="3.6"/>
+    </g>
+    <path class="boca" d="M18.5 30.5 Q24 33.5 29.5 30.5"/>
+  </svg>
   <h1>TERMINAL GEX</h1>
   <button id="atualizar">ATUALIZAR REGIOES</button>
   <button class="fantasma" id="btNiveis">niveis</button>
@@ -573,6 +656,20 @@ function mostraAgenda(d) {
 }
 
 /* ---------------------------------------------------- 2 e 3 */
+// O robozinho do cabecalho serve de sinal de atividade: fenda nos olhos
+// enquanto busca, aceno verde quando acaba, cara fechada se algo falhou.
+let voltaRobo = null;
+function humorRobo(estado) {
+  const r = $("#robo");
+  if (!r) return;
+  clearTimeout(voltaRobo);
+  r.classList.remove("pensando", "feliz", "triste");
+  if (estado) r.classList.add(estado);
+  if (estado === "feliz" || estado === "triste") {
+    voltaRobo = setTimeout(() => r.classList.remove("feliz", "triste"), 2600);
+  }
+}
+
 // piscada curta para o olho perceber que o valor mudou
 function piscar(elemento) {
   if (!elemento) return;
@@ -998,6 +1095,8 @@ async function exportar(ativo, plataforma) {
 async function atualizarTudo() {
   const bt = $("#atualizar");
   bt.disabled = true;
+  humorRobo("pensando");
+  let falhas = 0;
   const t0 = Date.now();
   const dias = $("#selDias").value;
   const passos = [];
@@ -1028,12 +1127,15 @@ async function atualizarTudo() {
     $("#status").textContent = "buscando " + nome + "  (" + (i + 1)
       + "/" + passos.length + ")";
     try { await fn(); } catch (e) {
+      falhas++;
       console.warn(nome, e);
     }
   }
   const seg = ((Date.now() - t0) / 1000).toFixed(0);
   $("#status").textContent = "atualizado as "
-    + new Date().toLocaleTimeString("pt-BR") + "  (" + seg + "s)";
+    + new Date().toLocaleTimeString("pt-BR") + "  (" + seg + "s"
+    + (falhas ? ", " + falhas + " com falha" : "") + ")";
+  humorRobo(falhas ? "triste" : "feliz");
   bt.disabled = false;
 }
 
