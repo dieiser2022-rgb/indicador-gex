@@ -17,6 +17,7 @@ ORDEM = [
     "Call Resistance", "Put Support", "HVL", "1D Min", "1D Max",
     "Call Resistance 2", "Put Support 2",
     "Call Resistance 0DTE", "Put Support 0DTE", "HVL 0DTE", "Gamma Wall 0DTE",
+    "GEX 1 0DTE", "GEX 2 0DTE", "GEX 3 0DTE", "GEX 4 0DTE", "GEX 5 0DTE",
     "Par Call Resistance", "Par Put Support", "Par HVL",
     "GEX 1", "GEX 2", "GEX 3", "GEX 4", "GEX 5",
     "GEX 6", "GEX 7", "GEX 8", "GEX 9", "GEX 10",
@@ -50,9 +51,14 @@ def faixa_do_dia(spot, iv):
 SEPARACAO_MINIMA = 0.0025   # 0,25% do preco entre um GEX e outro
 QUANTOS_GEX = 10
 
+# Os key levels de hoje sao menos, de proposito: no vencimento do dia o gamma
+# se concentra num punhado de strikes perto do dinheiro, e pedir dez devolveria
+# niveis irrelevantes so para fechar a conta.
+QUANTOS_GEX_0DTE = 5
+
 
 def escolher_gex(spot, por_strike, evitar=(), quantos=QUANTOS_GEX,
-                 separacao=SEPARACAO_MINIMA):
+                 separacao=SEPARACAO_MINIMA, completar=True):
     """Escolhe os strikes de maior concentracao, mas espalhados.
 
     Pegar simplesmente os dez maiores nao serve: o gamma e sempre mais alto
@@ -83,7 +89,11 @@ def escolher_gex(spot, por_strike, evitar=(), quantos=QUANTOS_GEX,
 
     # Se a separacao foi exigente demais e sobrou pouco, completa com os
     # maiores que ainda nao entraram, para nao devolver meia lista.
-    if len(escolhidos) < quantos:
+    #
+    # Para o 0DTE isso fica desligado (completar=False): la existem poucos
+    # strikes com gamma relevante, e completar a lista traria niveis colados
+    # nas paredes, que e exatamente o amontoado que a separacao evita.
+    if completar and len(escolhidos) < quantos:
         for strike, _ in candidatos:
             if len(escolhidos) >= quantos:
                 break
@@ -163,6 +173,18 @@ def calcular(G, dados_cboe, dias_padrao=45, dias_0dte=0):
             ja_usados.append(v)
     perfil = escolher_gex(spot, (padrao or {}).get("por_strike", {}), ja_usados)
 
+    # Key levels do vencimento de hoje. O gamma_wall entra na lista de evitar
+    # porque ele e, por definicao, o strike de maior concentracao - sem isso o
+    # primeiro key level seria sempre uma copia dele, com outro nome.
+    evitar_0dte = []
+    for chave in ("call_wall", "put_wall", "zero_gamma", "gamma_wall"):
+        v = (hoje or {}).get(chave)
+        if v:
+            evitar_0dte.append(v)
+    perfil_0dte = escolher_gex(spot, (hoje or {}).get("por_strike", {}),
+                               evitar_0dte, quantos=QUANTOS_GEX_0DTE,
+                               completar=False)
+
     return {
         "spot": spot,
         "iv": iv,
@@ -174,6 +196,7 @@ def calcular(G, dados_cboe, dias_padrao=45, dias_0dte=0):
         "min_dia": mn,
         "max_dia": mx,
         "gex_top": perfil,
+        "gex_top_0dte": perfil_0dte,
     }
 
 
@@ -220,6 +243,8 @@ def montar(ticker, calc, basis=0.0, fator=1.0, par=None):
         valores["Par HVL"] = conv_par(par.get("zero_gamma"))
     for i, strike in enumerate(calc.get("gex_top") or [], start=1):
         valores["GEX " + str(i)] = conv(strike)
+    for i, strike in enumerate(calc.get("gex_top_0dte") or [], start=1):
+        valores["GEX " + str(i) + " 0DTE"] = conv(strike)
 
     nome = (ticker or "").strip().upper()
     if nome and not nome.startswith("$"):

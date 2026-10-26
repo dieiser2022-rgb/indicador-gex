@@ -51,7 +51,17 @@ Três coisas que o indicador tolera de propósito:
 | `HVL 0DTE` | inversão gama de hoje | amarelo, pontilhada |
 | `Gamma Wall 0DTE` | maior concentração de hoje | roxo, linha cheia |
 | `1D Min` e `1D Max` | faixa esperada do dia | cinza, pontilhada |
+| `GEX 1 0DTE` a `GEX 5 0DTE` | key levels do vencimento de hoje | ciano, pontilhada |
 | `GEX 1` a `GEX 10` | strikes de maior concentração | azul, pontilhada |
+
+Os **key levels 0DTE** são os strikes de maior gamma considerando só os
+contratos que vencem hoje. É o mesmo cálculo do `GEX 1..10`, aplicado ao
+vencimento do dia — e é o equivalente ao que outras ferramentas chamam de
+*Key Level 0DTE*. Vêm **ligados**, mostrando 3 níveis.
+
+Os níveis que já têm campo próprio (as duas paredes 0DTE, o HVL 0DTE e o
+Gamma Wall 0DTE) são excluídos dessa lista, senão o primeiro key level seria
+sempre uma cópia do Gamma Wall com outro nome.
 
 ### O que dá para configurar
 

@@ -22,7 +22,7 @@ g_dados = "Dados"
 dados = input.text_area(defval = "", title = "Cole os dados aqui", group = g_dados)
 ver_aviso = input.bool(true, "Avisar na tela quando faltar dado", group = g_dados)
 ver_resumo = input.bool(true, "Mostrar quantos niveis foram lidos", group = g_dados)
-VERSAO = "4"
+VERSAO = "5"
 
 g_ver = "Mostrar ou esconder"
 ver_paredes = input.bool(true, "Paredes de call e put", group = g_ver)
@@ -76,6 +76,15 @@ cor_faixa = input.color(#94a3b8, "Cor", group = g_fx)
 est_faixa = input.string("Pontilhada", "Estilo da linha", options = ["Cheia", "Tracejada", "Pontilhada"], group = g_fx)
 esp_faixa = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_fx)
 rot_faixa = input.bool(true, "Mostrar rotulo", group = g_fx)
+
+g_k0 = "Key Levels 0DTE"
+ver_key0 = input.bool(true, "Mostrar os Key Levels 0DTE", group = g_k0)
+qtd_key0 = input.int(3, "Quantos mostrar", minval = 1, maxval = 5, group = g_k0)
+cor_key0 = input.color(#22d3ee, "Cor", group = g_k0)
+est_key0 = input.string("Pontilhada", "Estilo da linha", options = ["Cheia", "Tracejada", "Pontilhada"], group = g_k0)
+esp_key0 = input.int(1, "Espessura", minval = 1, maxval = 4, group = g_k0)
+rot_key0 = input.bool(true, "Mostrar rotulo", group = g_k0)
+txt_key0 = input.string("Key Level", "Texto", group = g_k0)
 
 g_gx = "GEX por strike"
 cor_gex = input.color(#38bdf8, "Cor", group = g_gx)
@@ -264,6 +273,13 @@ if barstate.islast
             if ver_faixa
                 marcar(buscar("1DMIN"), "1D Min", cor_faixa, estilo_de(est_faixa), esp_faixa, rot_faixa)
                 marcar(buscar("1DMAX"), "1D Max", cor_faixa, estilo_de(est_faixa), esp_faixa, rot_faixa)
+
+            // Key levels do vencimento de hoje. O nome normalizado de
+            // "GEX 1 0DTE" e "GEX10DTE": o espaco cai e as letras sobem para
+            // maiuscula, entao a chave montada aqui tem que ser sem espaco.
+            if ver_key0
+                for i = 1 to qtd_key0
+                    marcar(buscar("GEX" + str.tostring(i) + "0DTE"), txt_key0 + " " + str.tostring(i) + " 0DTE", cor_key0, estilo_de(est_key0), esp_key0, rot_key0)
 
             if ver_gex
                 for i = 1 to qtd_gex

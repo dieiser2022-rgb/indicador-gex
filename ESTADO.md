@@ -233,7 +233,23 @@ ignorado, maiúsculas e espaços não importam.
 Níveis reconhecidos: `Call Resistance`, `Put Support`, `Call Resistance 2`,
 `Put Support 2`, `Par Call Resistance`, `Par Put Support`, `Par HVL`, `HVL`,
 `Call Resistance 0DTE`, `Put Support 0DTE`, `HVL 0DTE`, `Gamma Wall 0DTE`,
-`1D Min`, `1D Max`, `GEX 1` a `GEX 10`.
+`GEX 1 0DTE` a `GEX 5 0DTE`, `1D Min`, `1D Max`, `GEX 1` a `GEX 10`.
+
+**Key levels 0DTE** (`GEX n 0DTE`): mesmo cálculo do `GEX 1..10`, aplicado só
+aos contratos que vencem hoje. Nasceram da comparação com o gráfico do mentor
+do usuário, que os chama de *Key Level 0DTE*. Três detalhes de projeto: são 5
+no máximo (`QUANTOS_GEX_0DTE`) porque no vencimento do dia o gamma se
+concentra num punhado de strikes; os níveis que já têm campo próprio — as duas
+paredes 0DTE, o HVL 0DTE e o **Gamma Wall 0DTE** — entram na lista de `evitar`,
+senão o primeiro key level seria sempre uma cópia do gamma wall; e o
+`completar=False` desliga o preenchimento de sobra do `escolher_gex`, que no
+0DTE traria níveis colados nas paredes.
+
+Equivalência com os nomes que o mentor usa: `Call/Put Wall 0DTE` = nosso
+`Call Resistance / Put Support 0DTE`; `Put High Gamma-2` = nosso
+`Put Support 2`; `Key Level-1/-2` = nosso `GEX 1/2`. Ainda **falta** o 0DTE do
+QQQ: os campos `Par` usam as paredes normais, porque `calcular_gamma` (que
+alimenta o cache por ativo) não liga `INCLUIR_0DTE`.
 
 São 48 ajustes agrupados. `GEX por strike` vem **desligado** (o usuário quer
 só call e put). Texto dos rótulos vem **preto**, rótulo **acima** da linha.
