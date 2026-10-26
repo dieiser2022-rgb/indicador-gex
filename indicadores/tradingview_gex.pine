@@ -21,6 +21,8 @@ indicator("GEX - Niveis de Gamma", shorttitle = "GEX", overlay = true, max_lines
 g_dados = "Dados"
 dados = input.text_area(defval = "", title = "Cole os dados aqui", group = g_dados)
 ver_aviso = input.bool(true, "Avisar na tela quando faltar dado", group = g_dados)
+ver_resumo = input.bool(true, "Mostrar quantos niveis foram lidos", group = g_dados)
+VERSAO = "3"
 
 g_ver = "Mostrar ou esconder"
 ver_paredes = input.bool(true, "Paredes de call e put", group = g_ver)
@@ -269,3 +271,9 @@ if barstate.islast
 
             if array.size(linhas) == 0
                 avisar("GEX: " + str.tostring(array.size(nomes)) + " niveis lidos, mas nada marcado para mostrar", cor_put)
+            else if ver_resumo
+                // Resumo de conferencia: quantos campos vieram na linha e
+                // quantos foram desenhados. Serve para pegar o caso em que o
+                // indicador e de uma versao anterior a da linha colada - ai
+                // os campos novos chegam e sao ignorados em silencio.
+                avisar("GEX v" + VERSAO + ": " + str.tostring(array.size(nomes)) + " campos lidos, " + str.tostring(array.size(linhas)) + " linhas no grafico", cor_gex)
