@@ -173,13 +173,19 @@ def main():
     for s in simbolos:
         tabela(s)
     print("")
-    print("=== fim. copie tudo acima e cole no chat ===")
+    print("=== fim do relatorio ===")
     return 0
 
 
 if __name__ == "__main__":
-    codigo = main()
     import os
+    import relatorio
+
+    # A captura joga o relatorio na area de transferencia no final, para o
+    # usuario nao precisar selecionar texto na janela preta.
+    with relatorio.capturar("relatorio_vencimentos.txt"):
+        codigo = main()
+
     if os.name == "nt":
         try:
             input("aperte ENTER para fechar...")

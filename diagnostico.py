@@ -183,12 +183,16 @@ def main():
         print("porta 8777: erro ao testar -", e)
 
     print("")
-    print("=== fim. copie tudo acima e cole no chat ===")
+    print("=== fim do relatorio ===")
     return 0
 
 
 if __name__ == "__main__":
-    codigo = main()
+    import relatorio
+
+    with relatorio.capturar("relatorio_diagnostico.txt"):
+        codigo = main()
+
     if os.name == "nt":
         try:
             input("aperte ENTER para fechar...")
