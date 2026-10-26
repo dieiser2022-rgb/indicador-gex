@@ -62,10 +62,18 @@ Daí em diante é um clique no ícone da barra de tarefas.
 
 | Arquivo | O que faz |
 |---|---|
-| `GEX.bat` | liga o terminal e abre o painel; se já estiver ligado, só reabre o painel |
+| `abrir.py` | liga o terminal; se já estiver ligado, só reabre o painel |
+| `GEX.bat` | duplo clique na pasta — chama o `abrir.py` |
 | `CRIAR_ATALHO.bat` | cria o atalho da área de trabalho, uma vez só |
 | `ATUALIZAR.bat` | baixa a versão mais nova do código |
 | `COPIAR_INDICADOR.bat` | copia o indicador do TradingView para a área de transferência |
+
+O atalho aponta para o `python.exe` com o `abrir.py` como argumento, e **não**
+para o `GEX.bat`. O motivo é uma limitação do Windows: atalho de `.bat` é
+resolvido até o `cmd.exe`, e a barra de tarefas fixa o ícone do `cmd`
+descartando o ícone configurado. Apontando para o `python.exe`, o ícone é
+respeitado. É por isso que a lógica de partida mora no `abrir.py` e não no
+`.bat`.
 
 A janela preta que abre é o servidor. Ela precisa ficar aberta enquanto o
 painel estiver em uso — pode minimizar, mas fechar derruba o painel.

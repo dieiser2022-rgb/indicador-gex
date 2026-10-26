@@ -36,8 +36,26 @@ type indicadores\tradingview_gex.pine | clip
 
 Os `.bat` existem porque o usuário queria um ícone na barra de tarefas. O
 `.gitattributes` força CRLF neles: com LF o `cmd` engasga em bloco entre
-parênteses. O `GEX.bat` testa a porta abrindo uma conexão TCP de verdade, não
-lendo `netstat` — a saída do `netstat` muda com o idioma do Windows.
+parênteses.
+
+**Armadilha já paga:** o Windows **não** aceita ícone próprio em atalho de
+`.bat`. Ele resolve o atalho até o `cmd.exe` e fixa o ícone do `cmd` na barra
+de tarefas, jogando fora o `IconLocation`. A primeira tentativa foi assim e
+apareceu como um cmd comum. A correção foi apontar o atalho para o
+`python.exe` com `abrir.py` como argumento — aí o ícone é respeitado. Por isso
+a lógica de partida mora no `abrir.py`, e o `GEX.bat` virou só um chamador.
+
+O `CRIAR_ATALHO.bat` descobre o caminho do executável por
+`python -c "import sys;print(sys.executable)"`, que funciona igual se o
+comando do usuário for `python` ou `py`. As aspas dos argumentos do atalho são
+montadas com `[char]34` no PowerShell, para não virar um festival de barras
+invertidas dentro do `cmd`.
+
+O `abrir.py` testa a porta abrindo uma conexão TCP de verdade, não lendo
+`netstat` — a saída do `netstat` muda com o idioma do Windows e lista também
+conexão que está se encerrando. Ele também tenta pôr título e ícone na janela
+do console via `ctypes` (`WM_SETICON`); no Windows Terminal do Windows 11 isso
+pode não ter efeito, e falha em silêncio de propósito.
 
 O ícone `gex.ico` é gerado por `fazer_icone.py`, em Python puro (struct, sem
 biblioteca de imagem). São 9 tamanhos, de 16 a 256 px. Para refazer, rode o
@@ -57,7 +75,8 @@ script. Prévia em `gex_previa.png`.
 | `testar_candles.py` | verifica quais fontes de candles respondem |
 | `indicadores/tradingview_gex.pine` | o indicador do TradingView |
 | `indicadores/README.md` | como instalar e configurar o indicador |
-| `GEX.bat` | liga o terminal; se já estiver ligado, só reabre o painel |
+| `abrir.py` | partida: testa a porta, sobe o terminal, segura o erro na tela |
+| `GEX.bat` | duplo clique na pasta; só chama o `abrir.py` |
 | `CRIAR_ATALHO.bat` | cria o atalho da área de trabalho, com ícone |
 | `ATUALIZAR.bat` | `git pull` com mensagem em português |
 | `COPIAR_INDICADOR.bat` | manda o `.pine` para a área de transferência |
