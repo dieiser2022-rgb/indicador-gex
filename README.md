@@ -67,6 +67,7 @@ Daí em diante é um clique no ícone da barra de tarefas.
 | `CRIAR_ATALHO.bat` | cria o atalho da área de trabalho, uma vez só |
 | `ATUALIZAR.bat` | baixa a versão mais nova do código |
 | `COPIAR_INDICADOR.bat` | copia o indicador do TradingView para a área de transferência |
+| `VER_VENCIMENTOS.bat` | lista os vencimentos da cadeia e checa se o 0DTE chegou |
 | `DIAGNOSTICO.bat` | relatório do ícone, dos atalhos e da porta, para colar no chat |
 | `LIMPAR_CACHE_ICONE.bat` | só se o atalho insistir em mostrar o ícone errado |
 
