@@ -18,17 +18,30 @@ Restrições que o projeto respeita desde o começo:
 
 ## Como rodar
 
+No Windows, duplo clique em `GEX.bat` — ou no atalho da barra de tarefas,
+criado uma vez por `CRIAR_ATALHO.bat`. Pela linha de comando:
+
 ```
 cd C:\indicador-gex
 git pull origin terminal-completo
 python terminal.py
 ```
 
-Abre em `http://localhost:8777`. Para copiar o indicador para o TradingView:
+Abre em `http://localhost:8777`. Para copiar o indicador para o TradingView,
+duplo clique em `COPIAR_INDICADOR.bat`, ou:
 
 ```
 type indicadores\tradingview_gex.pine | clip
 ```
+
+Os `.bat` existem porque o usuário queria um ícone na barra de tarefas. O
+`.gitattributes` força CRLF neles: com LF o `cmd` engasga em bloco entre
+parênteses. O `GEX.bat` testa a porta abrindo uma conexão TCP de verdade, não
+lendo `netstat` — a saída do `netstat` muda com o idioma do Windows.
+
+O ícone `gex.ico` é gerado por `fazer_icone.py`, em Python puro (struct, sem
+biblioteca de imagem). São 9 tamanhos, de 16 a 256 px. Para refazer, rode o
+script. Prévia em `gex_previa.png`.
 
 ## Arquivos
 
@@ -44,6 +57,11 @@ type indicadores\tradingview_gex.pine | clip
 | `testar_candles.py` | verifica quais fontes de candles respondem |
 | `indicadores/tradingview_gex.pine` | o indicador do TradingView |
 | `indicadores/README.md` | como instalar e configurar o indicador |
+| `GEX.bat` | liga o terminal; se já estiver ligado, só reabre o painel |
+| `CRIAR_ATALHO.bat` | cria o atalho da área de trabalho, com ícone |
+| `ATUALIZAR.bat` | `git pull` com mensagem em português |
+| `COPIAR_INDICADOR.bat` | manda o `.pine` para a área de transferência |
+| `fazer_icone.py` | gera `gex.ico` em Python puro |
 | `config.json` | cores e preferências (criado no primeiro uso, fora do git) |
 | `legado/` | primeiras tentativas raspando site de terceiros (abandonado) |
 

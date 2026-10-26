@@ -51,6 +51,27 @@ usando o basis calculado automaticamente.
 
 ## Como usar
 
+### Windows, com um clique
+
+Dê um duplo clique em **`CRIAR_ATALHO.bat`** uma vez. Ele põe um atalho
+"Terminal GEX" na área de trabalho, com ícone próprio. Clique com o botão
+direito nesse atalho e escolha **Fixar na barra de tarefas** (no Windows 11,
+primeiro em *Mostrar mais opções*).
+
+Daí em diante é um clique no ícone da barra de tarefas.
+
+| Arquivo | O que faz |
+|---|---|
+| `GEX.bat` | liga o terminal e abre o painel; se já estiver ligado, só reabre o painel |
+| `CRIAR_ATALHO.bat` | cria o atalho da área de trabalho, uma vez só |
+| `ATUALIZAR.bat` | baixa a versão mais nova do código |
+| `COPIAR_INDICADOR.bat` | copia o indicador do TradingView para a área de transferência |
+
+A janela preta que abre é o servidor. Ela precisa ficar aberta enquanto o
+painel estiver em uso — pode minimizar, mas fechar derruba o painel.
+
+### Pela linha de comando
+
 ```bash
 python terminal.py
 ```
@@ -78,6 +99,8 @@ python agendador.py
 | `terminal.py` | servidor local e interface web |
 | `agendador.py` | coleta periódica dentro do horário de mercado |
 | `testar_candles.py` | verifica quais fontes de candles respondem |
+| `fazer_icone.py` | gera `gex.ico`, o ícone do atalho (Python puro) |
+| `*.bat` | atalhos do Windows, descritos em *Como usar* |
 | `ESTADO.md` | estado do projeto, decisões tomadas e pendências |
 | `legado/` | primeiras tentativas, raspando um site de terceiros (abandonado) |
 
