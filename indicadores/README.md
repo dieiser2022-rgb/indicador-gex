@@ -68,8 +68,12 @@ transparência.
 
 **Rótulos, em geral** — posição (direita ou esquerda), forma (etiqueta com
 fundo ou somente o texto), distância, tamanho (de `tiny` a `large`), se mostra
-o preço junto do nome, transparência do fundo, e a opção de usar uma cor única
-para todo o texto em vez da cor de cada nível.
+o preço junto do nome, transparência do fundo, e a cor do texto.
+
+O texto dos rótulos vem **preto** por padrão (opção *Usar uma cor única para
+todo texto*, ligada). Para voltar ao comportamento antigo, em que cada rótulo
+sai na cor da própria linha, desligue essa opção. Para outra cor fixa, troque
+em *Cor única do texto*.
 
 **Zona entre as paredes** — sombreia a região entre a parede de call e a de
 put. Vem desligado; ligue em *Zona entre as paredes* se quiser o efeito.

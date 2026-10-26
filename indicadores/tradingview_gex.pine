@@ -22,7 +22,7 @@ g_dados = "Dados"
 dados = input.text_area(defval = "", title = "Cole os dados aqui", group = g_dados)
 ver_aviso = input.bool(true, "Avisar na tela quando faltar dado", group = g_dados)
 ver_resumo = input.bool(true, "Mostrar quantos niveis foram lidos", group = g_dados)
-VERSAO = "3"
+VERSAO = "4"
 
 g_ver = "Mostrar ou esconder"
 ver_paredes = input.bool(true, "Paredes de call e put", group = g_ver)
@@ -99,8 +99,8 @@ afastamento = input.int(3, "Afastamento do rotulo (barras)", minval = 0, group =
 desloca_ticks = input.int(6, "Deslocamento vertical (ticks)", minval = 0, group = g_ro)
 tam_texto = input.string("small", "Tamanho do texto", options = ["tiny", "small", "normal", "large"], group = g_ro)
 ver_preco = input.bool(true, "Mostrar o preco junto do nome", group = g_ro)
-cor_texto_fixa = input.bool(false, "Usar uma cor unica para todo texto", group = g_ro)
-cor_texto = input.color(#e2e8f0, "Cor unica do texto", group = g_ro)
+cor_texto_fixa = input.bool(true, "Usar uma cor unica para todo texto", group = g_ro)
+cor_texto = input.color(#000000, "Cor unica do texto", group = g_ro)
 transparencia = input.int(88, "Transparencia do fundo do rotulo", minval = 0, maxval = 100, group = g_ro)
 
 // -------------------------------------------------------- zona entre paredes
