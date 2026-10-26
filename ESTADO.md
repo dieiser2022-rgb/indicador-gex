@@ -276,6 +276,18 @@ e adicionar de novo — ou mexer na opção na mão.
 
 ## Onde paramos (26/10/2026)
 
+**Combinado com o usuário:** o executável/atalho para abrir o terminal fica
+para **mais tarde**. Ele pediu para pausar esse assunto depois de atualizar o
+indicador para a v5. Não retomar por conta própria — esperar ele trazer.
+
+Feito nesta sessão: `ver_vencimentos.py` (confirmou que o 0DTE chega em NDX e
+SPX, raízes `NDXP` e `SPXW`), relatórios que se copiam sozinhos para a área de
+transferência, key levels 0DTE no cálculo e no indicador (v5), e
+`copiar_indicador.py` lendo a versão do próprio `.pine`.
+
+Pendente de confirmação do usuário: se as linhas ciano dos key levels 0DTE
+apareceram no gráfico dele. Ele disse "acho que deu".
+
 **Ícone na barra de tarefas: não resolvido.** Quatro tentativas, nenhuma
 funcionou. O que o `diagnostico.py` já provou na máquina do usuário
 (Windows 10 19045, Python 3.13 em `AppData\Local`, área de trabalho no

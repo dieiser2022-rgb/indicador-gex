@@ -45,6 +45,11 @@ Mudar o valor padrão de um `input` **não** muda o gráfico que o usuário já 
 Para valer, ele precisa remover o indicador e adicionar de novo — avisar isso
 sempre.
 
+## Assunto pausado pelo usuário: executável / ícone na barra
+
+O usuário pediu para deixar o atalho de abrir o terminal **para mais tarde**.
+Não retomar por conta própria — esperar ele trazer o assunto.
+
 ## Assunto em aberto: ícone na barra de tarefas
 
 Quatro tentativas falharam. Leia a seção "Onde paramos" do `ESTADO.md` antes
