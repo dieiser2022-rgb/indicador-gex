@@ -45,6 +45,17 @@ Mudar o valor padrão de um `input` **não** muda o gráfico que o usuário já 
 Para valer, ele precisa remover o indicador e adicionar de novo — avisar isso
 sempre.
 
+## Assunto em aberto: ícone na barra de tarefas
+
+Quatro tentativas falharam. Leia a seção "Onde paramos" do `ESTADO.md` antes
+de propor qualquer coisa. O ícone e o atalho já foram **provados corretos** por
+`diagnostico.py`; falta só descobrir o que o Windows faz ao fixar.
+
+**Não escrever mais script sobre isso sem o usuário dizer o que falha.** As
+quatro tentativas foram às cegas e gastaram a paciência dele. A pergunta de
+múltipla escolha está aguardando resposta, e o `ARRUMAR_ICONE.bat` já está
+pronto e ainda não foi testado por ele.
+
 ## Limitações do ambiente
 
 O sandbox **não tem rede** (`INTEGRATIONS_ONLY`) e `web_fetch` dá 403 para

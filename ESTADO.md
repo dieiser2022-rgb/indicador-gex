@@ -258,6 +258,35 @@ valor padrão de um `input` no código **não muda** o que já está no gráfico
 usuário. Para o padrão novo valer, ele tem que remover o indicador do gráfico
 e adicionar de novo — ou mexer na opção na mão.
 
+## Onde paramos (26/10/2026)
+
+**Ícone na barra de tarefas: não resolvido.** Quatro tentativas, nenhuma
+funcionou. O que o `diagnostico.py` já provou na máquina do usuário
+(Windows 10 19045, Python 3.13 em `AppData\Local`, área de trabalho no
+OneDrive):
+
+- o `gex.ico` está **bom**: o Windows carrega nos 4 tamanhos testados
+  (`16:ok 32:ok 48:ok 256:ok`) — não é o arquivo
+- o atalho da área de trabalho está **correto**: alvo `python.exe`, argumento
+  `"C:\indicador-gex\abrir.py"`, ícone `gex.ico,0` — não é a configuração
+- **nada nosso aparece fixado** na barra de tarefas nem no menu iniciar
+
+Ou seja: o lançador funciona (duplo clique na área de trabalho abre o painel),
+só o "fixar na barra com o ícone certo" que não.
+
+Último estado da conversa: foi sugerido fixar **arrastando com o mouse** o
+atalho da área de trabalho até a barra (no Windows 10 isso fixa sem passar por
+menu), e foi feita uma pergunta de múltipla escolha para descobrir o que
+exatamente falha — se a opção "Fixar na barra de tarefas" não aparece, se fixa
+com ícone de cmd, se fixa com ícone do Python, ou se algum script deu erro.
+**O usuário ainda não respondeu**, e sem isso não há como escolher a correção.
+
+Aviso para a próxima sessão: não emendar mais scripts sem essa resposta. As
+quatro tentativas (ícone no `.bat`, atalho para o `python.exe`,
+`criar_atalho.py`, `arrumar_icone.py`) foram feitas às cegas e custaram a
+paciência do usuário. O caminho já pronto e não testado por ele é
+`ARRUMAR_ICONE.bat`, que reescreve o ícone do `.lnk` **depois** de fixado.
+
 ## Pendências
 
 1. **Parede de put divergia** da referência: a nossa ficava 1,4% a 3,3% longe
