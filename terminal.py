@@ -1,112 +1,198 @@
+"""Terminal GEX - servidor local.
+
+Uso:
+    python terminal.py
+
+Abre o navegador em http://localhost:8777
+"""
+
 import json
 import os
 import threading
+import traceback
 import types
-import urllib.request
 import webbrowser
-from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
+
+import exportar
+import fontes
+import leitura
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-
-
-def carregar_gamma():
-    # Aproveita as funcoes do gamma_cboe.py sem disparar a coleta dele.
-    # Funciona do jeito que o arquivo estiver: com main() solto no fim
-    # ou protegido por if __name__ == "__main__".
-    caminho = os.path.join(BASE, "gamma_cboe.py")
-    if not os.path.exists(caminho):
-        raise SystemExit("gamma_cboe.py nao encontrado na pasta " + BASE)
-    texto = open(caminho, encoding="utf-8").read()
-    uteis = []
-    for linha in texto.splitlines():
-        if linha.strip() == "main()":
-            # troca por pass em vez de apagar: se a linha estiver dentro
-            # de um if, apagar deixaria o bloco vazio e quebraria
-            recuo = linha[:len(linha) - len(linha.lstrip())]
-            uteis.append(recuo + "pass")
-        else:
-            uteis.append(linha)
-    mod = types.ModuleType("gamma_cboe")
-    exec(compile(chr(10).join(uteis), "gamma_cboe.py", "exec"), mod.__dict__)
-    return mod
-
-
-G = carregar_gamma()
-
 PORTA = 8777
+CONFIG = os.path.join(BASE, "config.json")
 
-# sem margem: assim o Put Wall bate com a convencao dos sites de referencia
-G.MARGEM = 0.0
-G.PASSOS = 61
-
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36"
-
-# indice da CBOE -> futuro equivalente no Yahoo
 ATIVOS = [
-    ("NDX", "NQ", "NQ%3DF", "Nasdaq-100"),
-    ("SPX", "ES", "ES%3DF", "S&P 500"),
+    ("NDX", "NQ", "NQ=F", "Nasdaq-100"),
+    ("SPX", "ES", "ES=F", "S&P 500"),
     ("QQQ", "", "", "ETF Nasdaq"),
     ("SPY", "", "", "ETF S&P 500"),
 ]
 
+GRAFICO_PADRAO = "NQ=F"
 
-def preco_yahoo(simbolo):
-    url = ("https://query1.finance.yahoo.com/v8/finance/chart/" + simbolo
-           + "?interval=15m&range=1d")
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=30) as r:
-            d = json.loads(r.read().decode("utf-8", "ignore"))
-        res = d.get("chart", {}).get("result")
-        if not res:
-            return None
-        q = (res[0].get("indicators", {}).get("quote") or [{}])[0]
-        fech = [x for x in (q.get("close") or []) if x]
-        return float(fech[-1]) if fech else None
-    except Exception:
-        return None
+CORES_PADRAO = {
+    "fundo": "#0b1120",
+    "painel": "#111c33",
+    "borda": "#1e293b",
+    "texto": "#e2e8f0",
+    "apagado": "#94a3b8",
+    "alta": "#22c55e",
+    "baixa": "#ef4444",
+    # call verde e put vermelho: segue o lado da aposta, nao o papel de
+    # suporte ou resistencia
+    "call_wall": "#4ade80",
+    "put_wall": "#f87171",
+    "inversao": "#fbbf24",
+    "destaque": "#38bdf8",
+    "botao": "#2563eb",
+}
 
 
-def calcular(indice, fut_nome, fut_yahoo):
+def carregar_gamma():
+    """Carrega gamma_cboe.py sem disparar a coleta dele."""
+    caminho = os.path.join(BASE, "gamma_cboe.py")
+    if not os.path.exists(caminho):
+        raise SystemExit("gamma_cboe.py nao encontrado em " + BASE)
+    texto = open(caminho, encoding="utf-8").read()
+    linhas = []
+    for l in texto.splitlines():
+        if l.strip() == "main()":
+            recuo = l[:len(l) - len(l.lstrip())]
+            linhas.append(recuo + "pass")
+        else:
+            linhas.append(l)
+    mod = types.ModuleType("gamma_cboe")
+    exec(compile(chr(10).join(linhas), "gamma_cboe.py", "exec"), mod.__dict__)
+    return mod
+
+
+G = carregar_gamma()
+G.MARGEM = 0.0
+G.PASSOS = 51
+
+CACHE = {"gamma": {}, "calendario": [], "noticias": [], "panorama": [],
+         "candles": {}, "atualizado": None}
+TRAVA = threading.Lock()
+
+
+# ------------------------------------------------------------------- config
+
+# cores usadas antes da troca: call vermelho e put verde
+CORES_ANTIGAS = {"call_wall": "#f87171", "put_wall": "#4ade80"}
+
+# Em que preco cada ativo e cotado: no futuro ou no indice a vista. Importa
+# porque a diferenca (o basis) passa de 200 pontos no Nasdaq - usar a base
+# errada desloca todos os niveis de uma vez.
+# MNQ e futuro sempre. USTEC e US100 sao CFD e dependem da corretora.
+ATIVOS_PADRAO = {
+    "MNQ": "futuro",
+    "USTEC": "futuro",
+    "US100": "futuro",
+}
+
+PLATAFORMAS = ("mt5", "ninjatrader", "tradingview")
+
+
+def ler_config():
+    cfg = {"cores": dict(CORES_PADRAO), "ativos": dict(ATIVOS_PADRAO),
+           "plataforma": "mt5", "dias_max": 45, "grafico": GRAFICO_PADRAO}
+    if os.path.exists(CONFIG):
+        try:
+            salvo = json.loads(open(CONFIG, encoding="utf-8").read())
+            if isinstance(salvo.get("cores"), dict):
+                cfg["cores"].update(salvo["cores"])
+            if isinstance(salvo.get("ativos"), dict):
+                cfg["ativos"].update({k: v for k, v in salvo["ativos"].items()
+                                      if k in ATIVOS_PADRAO
+                                      and v in ("futuro", "indice")})
+            if salvo.get("plataforma") in PLATAFORMAS:
+                cfg["plataforma"] = salvo["plataforma"]
+            for chave in ("dias_max", "grafico"):
+                if chave in salvo:
+                    cfg[chave] = salvo[chave]
+        except Exception:
+            pass
+
+    # Quem salvou as cores antes da troca tem call vermelho e put verde
+    # gravado em disco, o que sobrescreveria o padrao novo. Se o arquivo tem
+    # exatamente aquelas duas cores, troca. Cores escolhidas a mao nao mudam.
+    if all(cfg["cores"].get(k, "").lower() == v
+           for k, v in CORES_ANTIGAS.items()):
+        cfg["cores"]["call_wall"] = CORES_PADRAO["call_wall"]
+        cfg["cores"]["put_wall"] = CORES_PADRAO["put_wall"]
+
+    return cfg
+
+
+def gravar_config(novo):
+    cfg = ler_config()
+    if novo.get("reset_cores"):
+        cfg["cores"] = dict(CORES_PADRAO)
+    if isinstance(novo.get("cores"), dict):
+        cfg["cores"].update({k: v for k, v in novo["cores"].items()
+                             if k in CORES_PADRAO})
+    if isinstance(novo.get("ativos"), dict):
+        cfg["ativos"].update({k: v for k, v in novo["ativos"].items()
+                              if k in ATIVOS_PADRAO
+                              and v in ("futuro", "indice")})
+    if novo.get("plataforma") in PLATAFORMAS:
+        cfg["plataforma"] = novo["plataforma"]
+    if "dias_max" in novo:
+        try:
+            cfg["dias_max"] = max(0, int(novo["dias_max"]))
+        except (TypeError, ValueError):
+            pass
+    if "grafico" in novo:
+        cfg["grafico"] = str(novo["grafico"])
+    open(CONFIG, "w", encoding="utf-8").write(
+        json.dumps(cfg, indent=2, ensure_ascii=False))
+    return cfg
+
+
+# -------------------------------------------------------------------- gamma
+
+def calcular_gamma(indice, fut_nome, fut_yahoo, dias_max):
+    G.DIAS_MAX = dias_max
     dados = G.baixar(indice)
     spot, todas, usaveis, com_gamma, com_oi, venc, ivm = G.analisar(dados)
     if not usaveis:
-        return {"erro": "sem contratos usaveis para " + indice}
+        return {"indice": indice, "dias_max": dias_max,
+                "erro": ("nenhum contrato vence em " + str(dias_max)
+                         + " dia(s). Escolha uma janela de vencimento maior "
+                         + "no seletor acima do grafico.")}
 
     por_strike, call_gex, put_gex, _ = G.gex_por_strike(spot, usaveis)
     if not por_strike:
-        return {"erro": "nao foi possivel calcular gamma de " + indice}
+        return {"indice": indice, "erro": "nao foi possivel calcular gamma"}
 
     net = sum(por_strike.values())
     zg = G.achar_zero_gamma(spot, usaveis)
     cw, pw = G.paredes(spot, call_gex, put_gex)
 
-    strikes = sorted(por_strike.items(), key=lambda kv: kv[0])
-    perto = [kv for kv in strikes if abs(kv[0] - spot) / spot <= 0.04]
-    barras = [{"k": k, "v": v} for k, v in perto]
+    perto = [(k, v) for k, v in sorted(por_strike.items())
+             if abs(k - spot) / spot <= 0.035]
+    barras = [{"k": k, "v": v,
+               "c": call_gex.get(k, 0.0), "p": put_gex.get(k, 0.0)}
+              for k, v in perto]
 
     saida = {
-        "indice": indice,
-        "spot": spot,
-        "net_gex": net,
+        "indice": indice, "spot": spot, "net_gex": net,
         "regime": "POSITIVO" if net > 0 else "NEGATIVO",
-        "zero_gamma": zg,
-        "call_wall": cw,
-        "put_wall": pw,
-        "contratos": len(usaveis),
-        "barras": barras,
-        "futuro": None,
+        "zero_gamma": zg, "call_wall": cw, "put_wall": pw,
+        "contratos": len(usaveis), "dias_max": dias_max,
+        "barras": barras, "futuro": None,
     }
 
     if fut_yahoo:
-        pf = preco_yahoo(fut_yahoo)
-        if pf and spot:
-            base = pf - spot
+        c = fontes.cotacao(fut_yahoo)
+        if c and spot:
+            base = c["preco"] - spot
             saida["futuro"] = {
-                "nome": fut_nome,
-                "preco": pf,
-                "basis": base,
+                "nome": fut_nome, "simbolo": fut_yahoo,
+                "preco": c["preco"], "pct": c["pct"], "basis": base,
                 "zero_gamma": (zg + base) if zg else None,
                 "call_wall": (cw + base) if cw else None,
                 "put_wall": (pw + base) if pw else None,
@@ -114,179 +200,239 @@ def calcular(indice, fut_nome, fut_yahoo):
     return saida
 
 
-PAGINA = """<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<title>Terminal GEX</title>
-<style>
- * { box-sizing: border-box; }
- body { margin:0; background:#0b1120; color:#e2e8f0;
-        font-family: Segoe UI, Arial, sans-serif; }
- header { padding:18px 24px; border-bottom:1px solid #1e293b;
-          display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
- h1 { margin:0; font-size:20px; letter-spacing:1px; }
- #atualizar { background:#2563eb; color:#fff; border:0; border-radius:10px;
-              padding:16px 34px; font-size:17px; font-weight:bold; cursor:pointer; }
- #atualizar:hover { background:#1d4ed8; }
- #atualizar:disabled { background:#334155; cursor:wait; }
- #status { color:#94a3b8; font-size:14px; }
- .grade { display:grid; gap:16px; padding:20px 24px;
-          grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
- .card { background:#111c33; border:1px solid #1e293b; border-radius:12px;
-         padding:16px 18px; }
- .topo { display:flex; justify-content:space-between; align-items:baseline; }
- .tic { font-size:22px; font-weight:bold; }
- .sub { color:#64748b; font-size:12px; }
- .tag { font-size:11px; font-weight:bold; padding:4px 9px; border-radius:20px; }
- .neg { background:#7f1d1d; color:#fecaca; }
- .pos { background:#14532d; color:#bbf7d0; }
- .linha { display:flex; justify-content:space-between; padding:6px 0;
-          border-bottom:1px solid #16213a; font-size:14px; }
- .rot { color:#94a3b8; }
- .val { font-weight:bold; font-variant-numeric: tabular-nums; }
- .cw { color:#f87171; } .pw { color:#4ade80; }
- .zg { color:#fbbf24; } .sp { color:#e2e8f0; }
- .fut { margin-top:12px; padding-top:10px; border-top:1px dashed #334155; }
- .barras { margin-top:14px; }
- .bl { display:flex; align-items:center; gap:6px; height:17px;
-       font-size:11px; font-variant-numeric: tabular-nums; }
- .bl .kk { width:62px; text-align:right; color:#94a3b8; }
- .bl .zona { flex:1; display:flex; align-items:center; }
- .bl .meio { width:1px; background:#475569; height:17px; }
- .bar { height:9px; border-radius:2px; }
- .bpos { background:#22c55e; } .bneg { background:#ef4444; }
- .aqui { outline:1px solid #38bdf8; border-radius:3px; }
- footer { padding:10px 24px 30px; color:#475569; font-size:12px; }
-</style>
-</head>
-<body>
-<header>
-  <h1>TERMINAL GEX</h1>
-  <button id="atualizar">ATUALIZAR REGIOES</button>
-  <span id="status">clique para buscar os dados</span>
-</header>
-<div class="grade" id="grade"></div>
-<footer>
-  Dados de opcoes: CBOE (atraso de ~15 min). Precos de futuros: Yahoo Finance.
-  Niveis calculados localmente. Nao e recomendacao de investimento.
-</footer>
+def niveis_para_grafico(simbolo_grafico):
+    """Converte os niveis de cada indice para a escala do ativo do grafico.
 
-<script>
-const ATIVOS = ["NDX", "SPX", "QQQ", "SPY"];
+    NDX -> NQ e exato (basta somar o basis).
+    QQQ e SPX entram por proporcao, o que e aproximado: serve de referencia
+    visual, nao de nivel preciso.
+    """
+    gam = CACHE["gamma"]
+    base_indice = "NDX" if simbolo_grafico in ("NQ=F", "^NDX") else "SPX"
+    principal = gam.get(base_indice)
+    if not principal or principal.get("erro") or not principal.get("spot"):
+        return []
 
-function fmt(v, dec) {
-  if (v === null || v === undefined) return "N/A";
-  return Number(v).toLocaleString("pt-BR",
-    {minimumFractionDigits: dec, maximumFractionDigits: dec});
-}
+    fut = principal.get("futuro") or {}
+    basis = fut.get("basis", 0.0) if simbolo_grafico.endswith("=F") else 0.0
+    spot_base = principal["spot"]
+    niveis = []
 
-function bi(v) {
-  if (v === null || v === undefined) return "N/A";
-  const a = Math.abs(v);
-  if (a >= 1e9) return (v/1e9).toFixed(2) + " B";
-  if (a >= 1e6) return (v/1e6).toFixed(0) + " M";
-  if (a >= 1e3) return (v/1e3).toFixed(0) + " K";
-  return v.toFixed(0);
-}
+    def junta(origem, fator, exato):
+        d = gam.get(origem)
+        if not d or d.get("erro"):
+            return
+        for campo, rotulo, cor in (("call_wall", "CALL WALL", "call_wall"),
+                                   ("put_wall", "PUT WALL", "put_wall"),
+                                   ("zero_gamma", "INVERSAO", "inversao")):
+            v = d.get(campo)
+            if not v:
+                continue
+            niveis.append({
+                "preco": v * fator + basis,
+                "rotulo": origem + " " + rotulo,
+                "cor": cor,
+                "exato": exato,
+            })
 
-function barras(d) {
-  if (!d.barras || !d.barras.length) return "";
-  let maior = 0;
-  for (const b of d.barras) maior = Math.max(maior, Math.abs(b.v));
-  if (maior <= 0) return "";
-  let h = '<div class="barras">';
-  const ordenado = d.barras.slice().sort((a,b) => b.k - a.k);
-  for (const b of ordenado) {
-    const larg = Math.abs(b.v) / maior * 46;
-    const pos = b.v > 0;
-    const perto = Math.abs(b.k - d.spot) / d.spot < 0.0015;
-    h += '<div class="bl' + (perto ? ' aqui' : '') + '">';
-    h += '<span class="kk">' + fmt(b.k, 0) + '</span>';
-    h += '<span class="zona">';
-    h += pos ? '<span style="flex:1"></span><span class="meio"></span>'
-             : '<span style="flex:1;display:flex;justify-content:flex-end">'
-               + '<span class="bar bneg" style="width:' + larg + '%"></span></span>'
-               + '<span class="meio"></span>';
-    h += pos ? '<span class="bar bpos" style="width:' + larg + '%"></span>' : '';
-    h += '</span></div>';
-  }
-  return h + '</div>';
-}
+    junta(base_indice, 1.0, True)
 
-function card(d) {
-  if (d.erro) {
-    return '<div class="card"><div class="tic">' + d.indice +
-           '</div><div class="sub">' + d.erro + '</div></div>';
-  }
-  const dec = d.spot > 2000 ? 0 : 2;
-  let h = '<div class="card"><div class="topo"><div>';
-  h += '<div class="tic">' + d.indice + '</div>';
-  h += '<div class="sub">' + d.contratos + ' contratos</div></div>';
-  h += '<span class="tag ' + (d.regime === "POSITIVO" ? "pos" : "neg") + '">GAMA ' +
-       d.regime + '</span></div>';
-  h += '<div class="linha"><span class="rot">Spot</span><span class="val sp">' +
-       fmt(d.spot, dec) + '</span></div>';
-  h += '<div class="linha"><span class="rot">Inversao gama</span><span class="val zg">' +
-       fmt(d.zero_gamma, dec) + '</span></div>';
-  h += '<div class="linha"><span class="rot">Parede de call</span><span class="val cw">' +
-       fmt(d.call_wall, dec) + '</span></div>';
-  h += '<div class="linha"><span class="rot">Parede de put</span><span class="val pw">' +
-       fmt(d.put_wall, dec) + '</span></div>';
-  h += '<div class="linha"><span class="rot">GEX liquido</span><span class="val">US$ ' +
-       bi(d.net_gex) + '</span></div>';
+    # Alem do indice principal, plota apenas o par natural do mesmo mercado
+    # (o ETF equivalente). Jogar os quatro ativos no grafico daria 12 linhas
+    # e viraria uma zebra ilegivel.
+    par = {"NDX": "QQQ", "SPX": "SPY"}.get(base_indice)
+    d = gam.get(par) if par else None
+    if d and not d.get("erro") and d.get("spot"):
+        junta(par, spot_base / d["spot"], False)
 
-  if (d.futuro) {
-    const f = d.futuro;
-    h += '<div class="fut"><div class="topo"><div class="tic" style="font-size:17px">' +
-         f.nome + '</div><div class="sub">basis ' + fmt(f.basis, 2) + '</div></div>';
-    h += '<div class="linha"><span class="rot">Preco</span><span class="val sp">' +
-         fmt(f.preco, 2) + '</span></div>';
-    h += '<div class="linha"><span class="rot">Inversao gama</span><span class="val zg">' +
-         fmt(f.zero_gamma, 0) + '</span></div>';
-    h += '<div class="linha"><span class="rot">Parede de call</span><span class="val cw">' +
-         fmt(f.call_wall, 0) + '</span></div>';
-    h += '<div class="linha"><span class="rot">Parede de put</span><span class="val pw">' +
-         fmt(f.put_wall, 0) + '</span></div></div>';
-  }
-  h += barras(d);
-  return h + '</div>';
-}
+    niveis.sort(key=lambda n: n["preco"])
+    return niveis
 
-const botao = document.getElementById("atualizar");
-const status = document.getElementById("status");
-const grade = document.getElementById("grade");
 
-async function atualizar() {
-  botao.disabled = true;
-  grade.innerHTML = "";
-  const t0 = Date.now();
-  for (let i = 0; i < ATIVOS.length; i++) {
-    const a = ATIVOS[i];
-    status.textContent = "buscando " + a + " ... (" + (i+1) + " de " +
-                         ATIVOS.length + ")";
-    try {
-      const r = await fetch("/api/dados?simbolo=" + a);
-      const d = await r.json();
-      grade.insertAdjacentHTML("beforeend", card(d));
-    } catch (e) {
-      grade.insertAdjacentHTML("beforeend",
-        '<div class="card"><div class="tic">' + a +
-        '</div><div class="sub">falhou: ' + e + '</div></div>');
+# ------------------------------------------------------------------ rotas
+
+def rota_gamma(args):
+    pedido = (args.get("simbolo") or [""])[0].upper()
+    cfg = ler_config()
+    dias = int((args.get("dias") or [cfg["dias_max"]])[0])
+    for indice, fut, yh, desc in ATIVOS:
+        if indice == pedido:
+            try:
+                r = calcular_gamma(indice, fut, yh, dias)
+            except Exception as e:
+                r = {"indice": indice, "erro": str(e)}
+            with TRAVA:
+                CACHE["gamma"][indice] = r
+                CACHE["atualizado"] = datetime.now(timezone.utc).isoformat(
+                    timespec="seconds")
+            r = dict(r)
+            r["leitura"] = leitura.leitura_mm(r)
+            return r
+    return {"erro": "simbolo invalido: " + pedido}
+
+
+def rota_candles(args):
+    simbolo = (args.get("simbolo") or [GRAFICO_PADRAO])[0]
+    intervalo = (args.get("intervalo") or ["15m"])[0]
+    janela = (args.get("janela") or ["5d"])[0]
+    velas = fontes.candles(simbolo, intervalo, janela)
+    with TRAVA:
+        CACHE["candles"][simbolo] = velas
+    return {"simbolo": simbolo, "intervalo": intervalo,
+            "candles": velas, "niveis": niveis_para_grafico(simbolo)}
+
+
+def rota_calendario(args):
+    ev = fontes.calendario()
+    with TRAVA:
+        CACHE["calendario"] = ev
+    agora = int(datetime.now(timezone.utc).timestamp())
+    passados = [e for e in ev if e["ts"] <= agora]
+    futuros = [e for e in ev if e["ts"] > agora]
+    return {"agora": agora, "antes": passados[-3:], "depois": futuros[:3],
+            "todos": ev}
+
+
+def rota_noticias(args):
+    n = fontes.noticias(16)
+    with TRAVA:
+        CACHE["noticias"] = n
+    return {"noticias": n}
+
+
+def rota_panorama(args):
+    p = fontes.panorama()
+    with TRAVA:
+        CACHE["panorama"] = p
+    return {"panorama": p}
+
+
+def rota_juros(args):
+    """Historico do rendimento do Treasury de 10 anos."""
+    janela = (args.get("janela") or ["3mo"])[0]
+    velas = fontes.candles("^TNX", "1d", janela)
+    if not velas:
+        return {"erro": "nao foi possivel buscar o juro de 10 anos"}
+
+    # O ^TNX as vezes vem multiplicado por dez (41.2 em vez de 4.12). Juro de
+    # dez anos nao chega a 20% em condicao normal, entao acima disso divide.
+    escala = 0.1 if velas[-1]["c"] > 20 else 1.0
+    pontos = [{"t": v["t"], "v": round(v["c"] * escala, 4)} for v in velas]
+
+    atual = pontos[-1]["v"]
+    anterior = pontos[-2]["v"] if len(pontos) > 1 else atual
+    valores = [p["v"] for p in pontos]
+
+    with TRAVA:
+        CACHE["juros"] = pontos
+
+    return {
+        "simbolo": "^TNX", "nome": "Treasury 10 anos", "janela": janela,
+        "pontos": pontos, "atual": atual,
+        "variacao": round(atual - anterior, 4),
+        "minimo": min(valores), "maximo": max(valores),
+        "primeiro": valores[0],
     }
-  }
-  const seg = ((Date.now() - t0)/1000).toFixed(1);
-  const agora = new Date().toLocaleTimeString("pt-BR");
-  status.textContent = "atualizado as " + agora + " (levou " + seg + "s)";
-  botao.disabled = false;
-}
 
-botao.addEventListener("click", atualizar);
-atualizar();
-</script>
-</body>
-</html>
-"""
+
+def rota_morningcall(args):
+    with TRAVA:
+        gammas = [CACHE["gamma"].get(a[0]) for a in ATIVOS]
+        mc = leitura.morning_call(CACHE["panorama"], CACHE["calendario"],
+                                  CACHE["noticias"], gammas)
+    return mc
+
+
+def rota_exportar(args):
+    """Linha de dados pronta para colar no indicador da plataforma.
+
+    O ativo (MNQ, USTEC, US100) define o nome e a base de preco. A plataforma
+    (MT5, NinjaTrader, TradingView) define o formato - hoje os tres usam a
+    mesma linha de texto, mas isso muda quando cada um ganhar arquivo proprio.
+    """
+    cfg = ler_config()
+    ativo = (args.get("ativo") or ["MNQ"])[0].upper()
+    if ativo not in cfg["ativos"]:
+        ativo = "MNQ"
+    plataforma = (args.get("plataforma") or [cfg["plataforma"]])[0]
+    if plataforma not in PLATAFORMAS:
+        plataforma = "mt5"
+    simbolo = (args.get("simbolo") or [cfg["grafico"]])[0]
+    dias = int((args.get("dias") or [cfg["dias_max"]])[0])
+    ticker = ativo
+
+    indice = "NDX" if simbolo in ("NQ=F", "^NDX") else "SPX"
+
+    try:
+        dados = G.baixar(indice)
+    except Exception as e:
+        return {"ativo": ativo, "plataforma": plataforma,
+                "erro": "nao foi possivel baixar a CBOE: " + str(e)}
+
+    calc = exportar.calcular(G, dados, dias_padrao=dias)
+    if not calc:
+        return {"ativo": ativo, "plataforma": plataforma,
+                "erro": "sem contratos usaveis para " + indice}
+
+    # Base de preco do ativo escolhido. Quem segue o indice a vista nao leva
+    # o basis; quem segue o futuro leva.
+    base = cfg["ativos"].get(ativo, "futuro")
+    basis = 0.0
+    preco_futuro = None
+    if simbolo.endswith("=F"):
+        c = fontes.cotacao(simbolo)
+        if c and calc["spot"]:
+            preco_futuro = c["preco"]
+            if base == "futuro":
+                basis = c["preco"] - calc["spot"]
+
+    # Niveis do ativo irmao do mesmo mercado. Aproveita o que o painel ja
+    # calculou em vez de baixar de novo: sao 4 a 13 MB por ativo.
+    nome_par = {"NDX": "QQQ", "SPX": "SPY"}.get(indice)
+    par = None
+    with TRAVA:
+        bruto = CACHE["gamma"].get(nome_par) if nome_par else None
+    if bruto and not bruto.get("erro") and bruto.get("spot"):
+        par = {"nome": nome_par, "spot": bruto["spot"],
+               "call_wall": bruto.get("call_wall"),
+               "put_wall": bruto.get("put_wall"),
+               "zero_gamma": bruto.get("zero_gamma")}
+
+    linha, valores = exportar.montar(ticker, calc, basis=basis, par=par)
+
+    with TRAVA:
+        CACHE["exportado"] = {"linha": linha, "quando":
+                              datetime.now(timezone.utc).isoformat(timespec="seconds")}
+
+    aviso = ""
+    if not calc["tem_0dte"]:
+        aviso = ("Nenhum contrato vence hoje, entao os campos 0DTE ficaram de "
+                 "fora da linha. Normal em fim de semana e depois do "
+                 "fechamento.")
+
+    return {
+        "ativo": ativo, "plataforma": plataforma,
+        "simbolo": simbolo, "indice": indice,
+        "ticker": ticker, "linha": linha, "valores": valores,
+        "spot": calc["spot"], "basis": basis, "iv": calc["iv"],
+        "base": base, "preco_futuro": preco_futuro,
+        "contratos": calc["contratos"], "contratos_0dte": calc["contratos_0dte"],
+        "dias": dias, "niveis": niveis_para_grafico(simbolo),
+        "par": (par or {}).get("nome", ""),
+        "pronto": True, "aviso": aviso,
+    }
+
+
+ROTAS = {
+    "/api/gamma": rota_gamma,
+    "/api/candles": rota_candles,
+    "/api/calendario": rota_calendario,
+    "/api/noticias": rota_noticias,
+    "/api/panorama": rota_panorama,
+    "/api/juros": rota_juros,
+    "/api/morningcall": rota_morningcall,
+    "/api/exportar": rota_exportar,
+}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -294,50 +440,91 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, formato, *args):
         pass
 
-    def responder(self, codigo, corpo, tipo):
-        dados = corpo.encode("utf-8")
+    def _envia(self, codigo, corpo, tipo):
+        dados = corpo.encode("utf-8") if isinstance(corpo, str) else corpo
         self.send_response(codigo)
         self.send_header("Content-Type", tipo + "; charset=utf-8")
         self.send_header("Content-Length", str(len(dados)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(dados)
 
+    def _json(self, obj, codigo=200):
+        self._envia(codigo, json.dumps(obj, ensure_ascii=False), "application/json")
+
     def do_GET(self):
-        caminho = self.path.split("?")[0]
+        url = urlparse(self.path)
+        caminho = url.path
+        args = parse_qs(url.query)
 
-        if caminho == "/":
-            self.responder(200, PAGINA, "text/html")
-            return
-
-        if caminho == "/api/dados":
-            pedido = ""
-            if "simbolo=" in self.path:
-                pedido = self.path.split("simbolo=")[1].split("&")[0].upper()
-            escolhido = None
-            for indice, fut, yh, desc in ATIVOS:
-                if indice == pedido:
-                    escolhido = (indice, fut, yh)
-                    break
-            if not escolhido:
-                self.responder(400, json.dumps({"erro": "simbolo invalido"}),
-                               "application/json")
+        if caminho in ("/", "/index.html"):
+            arq = os.path.join(BASE, "painel.html")
+            if not os.path.exists(arq):
+                self._envia(500, "painel.html nao encontrado", "text/plain")
                 return
-            print("  calculando", pedido, "...")
-            try:
-                r = calcular(escolhido[0], escolhido[1], escolhido[2])
-            except Exception as e:
-                r = {"indice": pedido, "erro": str(e)}
-            self.responder(200, json.dumps(r), "application/json")
+            self._envia(200, open(arq, encoding="utf-8").read(), "text/html")
             return
 
-        self.responder(404, "nao encontrado", "text/plain")
+        if caminho == "/api/config":
+            self._json(ler_config())
+            return
+
+        if caminho == "/api/estado":
+            with TRAVA:
+                self._json({"atualizado": CACHE["atualizado"],
+                            "ativos": list(CACHE["gamma"].keys())})
+            return
+
+        fn = ROTAS.get(caminho)
+        if fn:
+            nome = caminho.split("/")[-1]
+            print("  >", nome, args.get("simbolo", [""])[0])
+            try:
+                self._json(fn(args))
+            except Exception as e:
+                # Imprime o rastro completo na janela do Python. Sem isso a
+                # causa real se perde: o navegador recebe so a frase curta.
+                print("  ! erro em", nome)
+                traceback.print_exc()
+                self._json({"erro": type(e).__name__ + ": " + str(e)}, 200)
+            return
+
+        self._envia(404, "nao encontrado", "text/plain")
+
+    def do_POST(self):
+        url = urlparse(self.path)
+        if url.path != "/api/config":
+            self._envia(404, "nao encontrado", "text/plain")
+            return
+        tamanho = int(self.headers.get("Content-Length") or 0)
+        bruto = self.rfile.read(tamanho).decode("utf-8") if tamanho else "{}"
+        try:
+            novo = json.loads(bruto)
+        except json.JSONDecodeError:
+            self._json({"erro": "json invalido"}, 400)
+            return
+        self._json(gravar_config(novo))
 
 
 def main():
     endereco = "http://localhost:" + str(PORTA)
-    servidor = HTTPServer(("127.0.0.1", PORTA), Handler)
-    print("terminal no ar em", endereco)
-    print("abrindo o navegador... (para parar, feche esta janela ou CTRL+C)")
+    try:
+        servidor = ThreadingHTTPServer(("127.0.0.1", PORTA), Handler)
+    except OSError as e:
+        # Porta ocupada e o caso mais comum: sobrou um terminal.py de antes.
+        # Sem esta mensagem o script morre com um erro de numero, e a pagina
+        # velha do navegador fica falhando sem explicacao.
+        print("")
+        print("Nao consegui abrir a porta", PORTA, "-", e)
+        print("")
+        print("Quase sempre e um terminal.py que ficou aberto de antes.")
+        print("Feche as outras janelas do Python e rode de novo. Para achar")
+        print("e encerrar o que esta na porta, no prompt do Windows:")
+        print("   netstat -ano | findstr 8777")
+        print("   taskkill /PID <o numero da ultima coluna> /F")
+        return
+    print("Terminal GEX no ar em", endereco)
+    print("para parar: CTRL+C")
     threading.Timer(1.0, lambda: webbrowser.open(endereco)).start()
     try:
         servidor.serve_forever()

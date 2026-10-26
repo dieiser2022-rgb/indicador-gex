@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal GEX</title>
+<style>
+:root {
+  --fundo: #0b1120; --painel: #111c33; --borda: #1e293b;
+  --texto: #e2e8f0; --apagado: #94a3b8;
+  --alta: #22c55e; --baixa: #ef4444;
+  /* call verde, put vermelho: a cor segue o lado da aposta */
+  --call_wall: #4ade80; --put_wall: #f87171; --inversao: #fbbf24;
+  --destaque: #38bdf8; --botao: #2563eb;
+}
+/* fonte propria para numeros: colunas sempre alinhadas */
+:root {
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; color: var(--texto);
+  font-family: "Segoe UI", system-ui, Arial, sans-serif; font-size: 14px;
+  display: flex; flex-direction: column; overflow: hidden;
+  /* brilho difuso no topo e grade fina ao fundo, sobre a cor configurada */
+  background-color: var(--fundo);
+  background-image:
+    radial-gradient(1200px 500px at 20% -10%, rgba(56,189,248,.10), transparent 70%),
+    radial-gradient(900px 400px at 85% -5%, rgba(37,99,235,.09), transparent 70%),
+    linear-gradient(rgba(148,163,184,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,.035) 1px, transparent 1px);
+  background-size: auto, auto, 44px 44px, 44px 44px;
+}
+header {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 18px; flex: none; position: relative;
+  border-bottom: 1px solid var(--borda);
+  background: linear-gradient(180deg, rgba(255,255,255,.035), transparent);
+}
+/* fio de luz embaixo do cabecalho */
+header::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--destaque), transparent);
+  opacity: .5;
+}
+h1 {
+  margin: 0; font-size: 17px; letter-spacing: 3px; font-weight: 700;
+  text-shadow: 0 0 18px rgba(56,189,248,.45);
+}
+button {
+  font-family: inherit; cursor: pointer; border: 0; border-radius: 8px;
+  color: #fff; background: var(--botao); padding: 9px 16px; font-size: 13px;
+  letter-spacing: .3px;
+  transition: filter .15s, box-shadow .15s, border-color .15s, background .15s;
+}
+button:hover { filter: brightness(1.18); }
+button:disabled { background: #334155; cursor: wait; filter: none;
+                  box-shadow: none; }
+#atualizar {
+  padding: 14px 30px; font-size: 16px; font-weight: bold; letter-spacing: 1px;
+  background: linear-gradient(180deg, var(--botao), rgba(0,0,0,.22));
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset,
+              0 6px 22px rgba(37,99,235,.35);
+}
+#atualizar:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset,
+              0 8px 30px rgba(37,99,235,.55);
+}
+.fantasma { background: transparent; border: 1px solid var(--borda);
+            color: var(--apagado); }
+.fantasma:hover { color: var(--texto); border-color: var(--destaque);
+                  box-shadow: 0 0 14px rgba(56,189,248,.18); }
+#status { color: var(--apagado); font-size: 12.5px; margin-left: auto;
+          font-family: var(--mono); letter-spacing: .3px; }
+
+/* barra de rolagem fina, no tom do painel */
+* { scrollbar-width: thin; scrollbar-color: var(--borda) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--apagado); }
+
+/* piscada curta quando um numero e atualizado */
+@keyframes pulso {
+  0% { filter: brightness(1.9); }
+  100% { filter: brightness(1); }
+}
+.pulso { animation: pulso .7s ease-out; }
+
+/* ---------- o robozinho do cabecalho ----------
+   Decoracao com uma funcao: ele muda de jeito conforme o painel trabalha,
+   entao serve de sinal de atividade. Tudo em SVG e CSS, sem imagem nem
+   biblioteca - some junto com o resto se o navegador for leve. */
+#robo { flex: none; overflow: visible; animation: flutua 3.4s ease-in-out infinite; }
+#robo .cabeca {
+  fill: var(--painel); stroke: var(--destaque); stroke-width: 1.6;
+  filter: drop-shadow(0 0 7px rgba(56,189,248,.45));
+}
+#robo .orelha { fill: var(--borda); stroke: var(--destaque); stroke-width: 1; }
+#robo .haste { stroke: var(--destaque); stroke-width: 1.6; }
+#robo .luz {
+  fill: var(--destaque);
+  filter: drop-shadow(0 0 6px var(--destaque));
+  animation: brilhaLuz 2.2s ease-in-out infinite;
+}
+#robo .olho {
+  fill: var(--destaque); transform-origin: center;
+  animation: piscaOlho 5s ease-in-out infinite;
+}
+#robo .boca { fill: none; stroke: var(--destaque); stroke-width: 1.5;
+              stroke-linecap: round; opacity: .75; }
+
+@keyframes flutua {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2.5px); }
+}
+@keyframes brilhaLuz {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: 1; }
+}
+/* piscada rapida, so de vez em quando */
+@keyframes piscaOlho {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94%           { transform: scaleY(.12); }
+}
+
+/* trabalhando: olhos viram fenda e a luz acelera */
+#robo.pensando .luz { animation-duration: .6s; }
+#robo.pensando .olho { animation: olhoFenda 1.1s ease-in-out infinite; }
+#robo.pensando { animation-duration: 1.4s; }
+@keyframes olhoFenda {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(.3); }
+}
+
+/* terminou: um aceno de cabeca e a cor vai para o verde por um instante */
+#robo.feliz .cabeca, #robo.feliz .haste, #robo.feliz .orelha {
+  stroke: var(--alta);
+}
+#robo.feliz .luz, #robo.feliz .olho { fill: var(--alta); }
+#robo.feliz .boca { stroke: var(--alta); }
+#robo.feliz { animation: acena .7s ease-in-out; }
+@keyframes acena {
+  0%, 100% { transform: rotate(0); }
+  25%      { transform: rotate(-9deg); }
+  75%      { transform: rotate(9deg); }
+}
+
+/* ---------- o robo grande, com aneis em orbita ---------- */
+.rb { display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 6px; }
+#roboG { width: 100%; max-height: 132px; overflow: visible; }
+/* balao de fala: a setinha e um quadrado girado no topo */
+#balao {
+  position: relative; margin-top: 4px; width: 100%;
+  background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: 9px; padding: 7px 9px; text-align: center;
+  color: var(--texto); font-size: 10.5px; line-height: 1.35;
+  min-height: 32px; display: flex; align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(56,189,248,.10) inset;
+  transition: border-color .2s, color .2s;
+}
+#balao::before {
+  content: ""; position: absolute; top: -4px; left: 50%; width: 7px;
+  height: 7px; margin-left: -3.5px; transform: rotate(45deg);
+  background: var(--fundo);
+  border-left: 1px solid var(--borda); border-top: 1px solid var(--borda);
+}
+#balao.alerta { border-color: var(--baixa); color: var(--baixa); }
+#balao.alerta::before { border-color: var(--baixa); }
+#balao.bom { border-color: var(--alta); color: var(--alta); }
+#balao.bom::before { border-color: var(--alta); }
+#btVoz { width: 100%; margin-top: 6px; font-size: 9.5px; padding: 5px;
+         letter-spacing: 1px; text-transform: uppercase; }
+#btVoz.ligada { color: var(--destaque); border-color: var(--destaque);
+                box-shadow: 0 0 12px rgba(56,189,248,.2); }
+/* onda sonora quando esta falando */
+#roboG.falando .boca { animation: fala .35s ease-in-out infinite; }
+@keyframes fala {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(2.2); }
+}
+#roboG .boca { transform-origin: 85px 74px; }
+#roboG .cabeca {
+  fill: var(--painel); stroke: var(--destaque); stroke-width: 2;
+  filter: drop-shadow(0 0 10px rgba(56,189,248,.5));
+}
+#roboG .orelha { fill: var(--borda); stroke: var(--destaque); stroke-width: 1.2; }
+#roboG .haste { stroke: var(--destaque); stroke-width: 2; }
+#roboG .luz {
+  fill: var(--destaque); filter: drop-shadow(0 0 9px var(--destaque));
+  animation: brilhaLuz 2.2s ease-in-out infinite;
+}
+#roboG .olho {
+  fill: var(--destaque); transform-origin: center;
+  animation: piscaOlho 5s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px var(--destaque));
+}
+#roboG .boca { fill: none; stroke: var(--destaque); stroke-width: 2;
+               stroke-linecap: round; opacity: .8; }
+/* os aneis sao tracejados e giram: e o que da a sensacao de orbita */
+#roboG .anel circle {
+  fill: none; stroke: var(--destaque); stroke-width: 1.2; opacity: .4;
+}
+#roboG .anelFora circle { stroke-dasharray: 3 11; }
+#roboG .anelDentro circle { stroke-dasharray: 2 9; opacity: .28; }
+#roboG .anel { transform-origin: 85px 62px; }
+#roboG .anelFora { animation: giraDireita 22s linear infinite; }
+#roboG .anelDentro { animation: giraEsquerda 15s linear infinite; }
+#roboG .satelites { transform-origin: 85px 62px;
+                    animation: giraDireita 9s linear infinite; }
+#roboG .sat { fill: var(--destaque); opacity: .75;
+              filter: drop-shadow(0 0 5px var(--destaque)); }
+
+@keyframes giraDireita  { to { transform: rotate(360deg); } }
+@keyframes giraEsquerda { to { transform: rotate(-360deg); } }
+
+/* trabalhando: orbita acelera e os olhos viram fenda */
+#roboG.pensando .anelFora { animation-duration: 4s; }
+#roboG.pensando .anelDentro { animation-duration: 2.6s; }
+#roboG.pensando .satelites { animation-duration: 2s; }
+#roboG.pensando .luz { animation-duration: .6s; }
+#roboG.pensando .olho { animation: olhoFenda 1.1s ease-in-out infinite; }
+
+/* terminou bem: tudo verde por um instante */
+#roboG.feliz .cabeca, #roboG.feliz .haste, #roboG.feliz .orelha { stroke: var(--alta); }
+#roboG.feliz .luz, #roboG.feliz .olho, #roboG.feliz .sat { fill: var(--alta); }
+#roboG.feliz .boca { stroke: var(--alta); }
+#roboG.feliz .anel circle { stroke: var(--alta); }
+
+/* falhou: vermelho e boca para baixo */
+#roboG.triste .cabeca, #roboG.triste .haste, #roboG.triste .orelha { stroke: var(--baixa); }
+#roboG.triste .luz, #roboG.triste .olho, #roboG.triste .sat { fill: var(--baixa); }
+#roboG.triste .anel circle { stroke: var(--baixa); }
+#roboG.triste .boca { stroke: var(--baixa); transform: rotate(180deg);
+                      transform-origin: 85px 76px; }
+
+/* deu problema: a luz fica vermelha e a boca virada para baixo */
+#robo.triste .cabeca, #robo.triste .haste, #robo.triste .orelha {
+  stroke: var(--baixa);
+}
+#robo.triste .luz, #robo.triste .olho { fill: var(--baixa); }
+/* vira a boca para baixo girando o traco, em vez de trocar o desenho:
+   mudar 'd' por CSS nao funciona em todo navegador */
+#robo.triste .boca { stroke: var(--baixa); transform: rotate(180deg);
+                     transform-origin: 24px 31.5px; }
+#robo.triste { animation: none; }
+
+/* a grade ocupa toda a altura que sobra da janela: a linha de cima fica do
+   tamanho do conteudo e a de baixo (grafico, morning call, noticias) estica */
+.grade {
+  display: grid; gap: 12px; padding: 12px 18px;
+  grid-template-columns: 300px 1fr 320px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "topo   topo    topo"
+    "manha  grafico news";
+  flex: 1; min-height: 0;
+}
+.grade > .caixa, .grade > .topo { min-height: 0; }
+/* a linha de cima e um flex: assim a caixa do GEX fica estreita em vez de
+   esticar junto com o texto do market maker, que e comprido */
+.topo { grid-area: topo; display: flex; gap: 12px; align-items: stretch;
+        max-height: 34vh; }
+.topo .caixa { overflow-y: auto; }
+.topo .ag { width: 290px; flex: none; }
+.topo .rg { width: 200px; flex: none; }
+.topo .dc { flex: 1; min-width: 0; }
+.topo .rl { width: 196px; flex: none; }
+.topo .jr { width: 258px; flex: none; }
+.topo .rb { width: 196px; flex: none; }
+.topo .ex { width: 262px; flex: none; }
+@media (max-width: 1250px) {
+  .grade { grid-template-columns: 1fr;
+    grid-template-areas: "topo" "grafico" "manha" "news"; }
+  .topo { flex-wrap: wrap; }
+  .topo .ag, .topo .rg, .topo .dc, .topo .rl, .topo .jr, .topo .rb,
+  .topo .ex { width: 100%; }
+}
+
+/* ---------- relogio e sessoes de mercado ---------- */
+.rlHoras { display: flex; gap: 8px; margin-bottom: 9px; }
+.rlBloco { flex: 1; min-width: 0; }
+.rlBloco span { display: block; font-family: var(--mono); font-size: 17px;
+                font-weight: 700; letter-spacing: -.5px; line-height: 1.1; }
+.rlBloco i { display: block; color: var(--apagado); font-size: 8.5px;
+             letter-spacing: .8px; text-transform: uppercase;
+             font-style: normal; margin-top: 1px; }
+.ses { margin-bottom: 5px; }
+.sesTopo { display: flex; justify-content: space-between; gap: 5px;
+           font-size: 9.5px; margin-bottom: 2px; }
+.sesTopo b { font-weight: 600; letter-spacing: .3px; }
+.sesTopo span { color: var(--apagado); font-family: var(--mono);
+                font-size: 9px; }
+.sesBarra { height: 4px; border-radius: 3px; background: var(--borda);
+            overflow: hidden; }
+.sesBarra i { display: block; height: 100%; border-radius: 3px;
+              background: var(--apagado); transition: width .5s; }
+.ses.aberta .sesTopo b { color: var(--alta); }
+.ses.aberta .sesBarra i { background: var(--alta);
+                          box-shadow: 0 0 8px var(--alta); }
+/* tela cheia: o painel ja ocupa a altura toda, entao basta tirar a sobra */
+:fullscreen .grade { padding: 10px 12px; }
+
+/* ---------- juros de 10 anos ---------- */
+.jr { display: flex; flex-direction: column; }
+.jr h2 select {
+  margin-left: auto; background: var(--fundo); color: var(--apagado);
+  border: 1px solid var(--borda); border-radius: 6px; padding: 2px 5px;
+  font-family: inherit; font-size: 9.5px; text-transform: none;
+  letter-spacing: 0;
+}
+.jrTopo { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+#jrAtual { font-size: 26px; font-weight: 800; font-family: var(--mono);
+           line-height: 1.1; }
+#jrVar { font-size: 11px; font-weight: 700; font-family: var(--mono); }
+#svgJuros { width: 100%; height: 92px; display: block; }
+.jrPe { display: flex; justify-content: space-between; gap: 6px;
+        color: var(--apagado); font-size: 9.5px; font-family: var(--mono);
+        margin-top: 2px; }
+#jrNota { text-align: center; font-family: "Segoe UI", sans-serif;
+          font-size: 9.5px; letter-spacing: .2px; }
+.caixa {
+  background-color: var(--painel);
+  /* leve brilho de cima para baixo, por cima da cor escolhida */
+  background-image: linear-gradient(180deg, rgba(255,255,255,.04), transparent 55%);
+  border: 1px solid var(--borda); border-radius: 12px;
+  padding: 12px 14px; min-width: 0; position: relative;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset,
+              0 10px 30px rgba(0,0,0,.35);
+  transition: border-color .2s, box-shadow .2s;
+}
+.caixa:hover {
+  border-color: rgba(56,189,248,.28);
+  box-shadow: 0 1px 0 rgba(255,255,255,.05) inset,
+              0 10px 34px rgba(0,0,0,.42),
+              0 0 0 1px rgba(56,189,248,.10);
+}
+.caixa h2 {
+  margin: 0 0 10px; font-size: 10.5px; letter-spacing: 2px;
+  color: var(--apagado); text-transform: uppercase; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+/* tracinho luminoso antes do titulo */
+.caixa h2::before {
+  content: ""; width: 3px; height: 11px; flex: none; border-radius: 2px;
+  background: var(--destaque); box-shadow: 0 0 10px var(--destaque);
+}
+.gr { grid-area: grafico; }
+.mn { grid-area: manha; }  .nw { grid-area: news; }
+
+
+/* ---------- 2: regime em destaque ---------- */
+.rg { text-align: center; padding: 14px 12px;
+      display: flex; flex-direction: column; justify-content: center; }
+#gexValor { font-size: 32px; font-weight: 800; line-height: 1.05; margin: 4px 0;
+            font-family: var(--mono); letter-spacing: -.5px; }
+#gexRegime { font-size: 11.5px; font-weight: 700; letter-spacing: 2.5px; }
+#gexAtivo { color: var(--apagado); font-size: 10px; line-height: 1.3;
+            letter-spacing: .6px; text-transform: uppercase; }
+#gexExtra { color: var(--apagado); font-size: 10.5px; margin-top: 10px;
+            padding-top: 8px; border-top: 1px solid var(--borda);
+            display: flex; justify-content: space-between;
+            font-family: var(--mono); }
+/* o brilho acompanha a cor, entao verde e vermelho acendem igual */
+.positivo { color: var(--alta); text-shadow: 0 0 22px rgba(34,197,94,.5); }
+.negativo { color: var(--baixa); text-shadow: 0 0 22px rgba(239,68,68,.5); }
+
+/* ---------- 1: agenda ---------- */
+.ev { display: flex; gap: 8px; align-items: baseline; padding: 5px 0;
+      border-bottom: 1px solid rgba(148,163,184,.10); font-size: 12.5px;
+      transition: background .15s; }
+.ev:hover { background: rgba(148,163,184,.05); }
+.ev .hora { color: var(--apagado); width: 40px; flex: none;
+            font-variant-numeric: tabular-nums; font-family: var(--mono);
+            font-size: 11.5px; }
+/* as bolinhas da agenda ficam em coluna propria, antes da hora */
+.ev .rel { padding-top: 4px; }
+/* evento de alto impacto chama atencao sem precisar ler a hora */
+.ev.imp3 .tit { font-weight: 600; }
+table.cal .rel { vertical-align: middle; }
+.ev .tit { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+           white-space: nowrap; }
+.ev .vals { color: var(--apagado); font-size: 11px; flex: none; }
+.ev.passou { opacity: .45; }
+.imp3 { border-left: 3px solid var(--baixa); padding-left: 6px; }
+.imp2 { border-left: 3px solid var(--inversao); padding-left: 6px; }
+.imp1 { border-left: 3px solid var(--borda); padding-left: 6px; }
+.agora { text-align: center; color: var(--destaque); font-size: 10px;
+         letter-spacing: 2px; padding: 5px 0; text-transform: uppercase;
+         text-shadow: 0 0 12px rgba(56,189,248,.6); }
+
+/* ---------- 3: dica do market maker ---------- */
+.dc p { margin: 0 0 8px; line-height: 1.45; font-size: 13px; }
+.alerta { background: rgba(239,68,68,.12); border-left: 3px solid var(--baixa);
+          padding: 6px 9px; border-radius: 4px; margin-bottom: 6px;
+          font-size: 12.5px; }
+.rodape { color: var(--apagado); font-size: 11px; font-style: italic;
+          margin-top: 8px; }
+
+/* ---------- 4 e 5: grafico ---------- */
+.gr { padding: 8px; display: flex; flex-direction: column; min-height: 0; }
+.barraTopo { display: flex; gap: 8px; align-items: center; margin-bottom: 6px;
+             flex-wrap: wrap; }
+.barraTopo select, .barraTopo input {
+  background: var(--fundo); color: var(--texto); border: 1px solid var(--borda);
+  border-radius: 7px; padding: 5px 9px; font-family: inherit; font-size: 11.5px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.barraTopo select:hover, .barraTopo select:focus {
+  border-color: var(--destaque); outline: 0;
+  box-shadow: 0 0 12px rgba(56,189,248,.18);
+}
+#infoGrafico { font-family: var(--mono); font-size: 10.5px; }
+#svgGrafico { width: 100%; flex: 1; min-height: 0; display: block; }
+.legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px;
+           color: var(--apagado); margin-top: 4px; }
+.legenda i { display: inline-block; width: 12px; height: 3px;
+             vertical-align: middle; margin-right: 4px; }
+
+/* ---------- 6: noticias ---------- */
+.nt { padding: 7px 8px 7px 0; border-bottom: 1px solid rgba(148,163,184,.10);
+      cursor: pointer; transition: background .15s, padding-left .15s;
+      border-left: 2px solid transparent; }
+.nt:hover { background: rgba(148,163,184,.05);
+            border-left-color: var(--destaque); padding-left: 6px; }
+.nt .meta { color: var(--apagado); font-size: 10px; margin-bottom: 3px;
+            font-family: var(--mono); letter-spacing: .2px;
+            display: flex; align-items: center; gap: 6px; }
+/* Tres bolinhas: quantas estao acesas indica o alcance do assunto. Usado
+   nas noticias e na agenda, com a mesma leitura visual nos dois. */
+.rel { display: inline-flex; gap: 2.5px; flex: none; }
+.rel i { width: 5px; height: 5px; border-radius: 50%;
+         background: var(--borda); display: block; }
+.peso3 .rel i.on, .imp3 .rel i.on { background: var(--baixa);
+                                    box-shadow: 0 0 6px var(--baixa); }
+.peso2 .rel i.on, .imp2 .rel i.on { background: var(--inversao);
+                                    box-shadow: 0 0 5px var(--inversao); }
+.peso1 .rel i.on, .imp1 .rel i.on { background: var(--apagado); }
+/* a borda esquerda repete a cor, para achar o que importa de relance */
+.nt.peso3 { border-left-color: rgba(239,68,68,.55); }
+.nt.peso2 { border-left-color: rgba(251,191,36,.4); }
+.nt.peso3 .tl { font-weight: 600; }
+.nt .tl { font-size: 12.5px; line-height: 1.35; }
+.nt .rs { color: var(--apagado); font-size: 11.5px; line-height: 1.4;
+          margin-top: 4px; display: none; }
+.nt .trad { background: rgba(56,189,248,.16); color: var(--destaque);
+            font-size: 9px; padding: 1px 5px; border-radius: 8px;
+            margin-left: 6px; }
+.nt.aberta .rs { display: block; }
+.nw { overflow-y: auto; }
+
+/* ---------- 7: morning call ---------- */
+.mc { margin-bottom: 9px; }
+.mc .t { color: var(--destaque); font-size: 9.5px; letter-spacing: 1.6px;
+         text-transform: uppercase; margin-bottom: 3px; font-weight: 700; }
+.mc .v { font-size: 12.5px; line-height: 1.4; }
+.mn { overflow-y: auto; }
+
+/* ---------- 8: cards ---------- */
+.cards { display: grid; gap: 10px;
+         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card { background-color: var(--fundo);
+        background-image: linear-gradient(180deg, rgba(255,255,255,.03), transparent);
+        border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px;
+        transition: border-color .18s; }
+.card:hover { border-color: rgba(56,189,248,.3); }
+.card .cab { display: flex; justify-content: space-between;
+             align-items: baseline; margin-bottom: 6px; }
+.card .tic { font-size: 18px; font-weight: 800; letter-spacing: .5px; }
+.card .sub { color: var(--apagado); font-size: 10px; letter-spacing: .4px; }
+.selo { font-size: 9px; font-weight: 800; padding: 3px 8px;
+        border-radius: 20px; letter-spacing: 1px; border: 1px solid transparent; }
+.selo.pos { background: rgba(34,197,94,.14); color: var(--alta);
+            border-color: rgba(34,197,94,.4);
+            box-shadow: 0 0 12px rgba(34,197,94,.2); }
+.selo.neg { background: rgba(239,68,68,.14); color: var(--baixa);
+            border-color: rgba(239,68,68,.4);
+            box-shadow: 0 0 12px rgba(239,68,68,.2); }
+.lin { display: flex; justify-content: space-between; padding: 3.5px 0;
+       font-size: 12.5px; }
+.lin span:first-child { color: var(--apagado); }
+.lin b { font-variant-numeric: tabular-nums; font-family: var(--mono);
+         font-size: 12px; }
+.fut { margin-top: 8px; padding-top: 7px;
+       border-top: 1px dashed var(--borda); }
+
+/* ---------- 9: exportar ---------- */
+.ex h2 { display: flex; align-items: center; justify-content: space-between;
+         gap: 6px; flex-wrap: wrap; }
+/* com quatro opcoes o espaco fica justo: deixa quebrar para a linha de baixo
+   em vez de espremer ou cortar */
+/* Ativo a esquerda, plataforma a direita: o ativo define o nome e a base de
+   preco, a plataforma define o formato. */
+.gerarGrade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ativos { display: flex; flex-direction: column; gap: 7px; }
+.ativos button.ativo {
+  padding: 14px 8px; font-size: 12.5px; font-weight: 800; letter-spacing: 1.5px;
+  background: linear-gradient(180deg, rgba(255,255,255,.05), transparent);
+  border: 1px solid var(--borda); color: var(--texto);
+  font-family: var(--mono);
+}
+.ativos button.ativo:hover {
+  border-color: var(--destaque); color: #fff;
+  background: linear-gradient(180deg, rgba(56,189,248,.18), rgba(56,189,248,.05));
+  box-shadow: 0 0 18px rgba(56,189,248,.25);
+}
+.ativos button.ativo.ok {
+  background: var(--alta); border-color: var(--alta); color: #07140a;
+  box-shadow: 0 0 26px rgba(34,197,94,.55);
+}
+.plataformas { display: flex; flex-direction: column; gap: 7px;
+               justify-content: flex-start; }
+.plataformas label { display: flex; align-items: center; gap: 6px;
+                     cursor: pointer; font-size: 11px; color: var(--apagado);
+                     letter-spacing: .3px; }
+.plataformas label:hover { color: var(--texto); }
+.plataformas input { accent-color: var(--destaque); margin: 0; cursor: pointer;
+                     width: 15px; height: 15px; }
+.baseAtivo { display: flex; align-items: center; gap: 6px; margin-top: auto;
+             padding-top: 8px; font-size: 10px; color: var(--apagado);
+             text-transform: uppercase; letter-spacing: .5px; }
+#estadoGerar { min-height: 14px; margin: 9px 0 0; }
+.escondido { display: none; }
+#btVer { width: 100%; margin-top: 8px; font-size: 11.5px; }
+.ex .aviso { color: var(--apagado); font-size: 10.5px; line-height: 1.35;
+             margin-top: 8px; display: block; }
+button.base { padding: 5px 11px; background: transparent;
+              border: 1px solid var(--borda); color: var(--apagado);
+              font-size: 10px; font-weight: bold; }
+button.base.fut { color: var(--destaque); border-color: var(--destaque); }
+button.base.idx { color: var(--inversao); border-color: var(--inversao); }
+
+/* ---------- modais e config ---------- */
+.modal { position: fixed; inset: 0; background: rgba(2,6,16,.78);
+         display: none; align-items: center; justify-content: center;
+         z-index: 50; padding: 20px; backdrop-filter: blur(6px); }
+.modal.on { display: flex; }
+.modalCorpo {
+  background-color: var(--painel);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.05), transparent 40%);
+  border: 1px solid var(--borda); border-radius: 14px; padding: 18px;
+  max-width: 760px; width: 100%; max-height: 82vh; overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(56,189,248,.12);
+}
+.cores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+         gap: 8px; }
+.cor { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.cor input[type=color] { width: 34px; height: 26px; padding: 0; border: 0;
+                         background: none; cursor: pointer; }
+table.cal { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.cal td, table.cal th { padding: 5px 6px; text-align: left;
+       border-bottom: 1px solid rgba(148,163,184,.12); }
+table.cal th { color: var(--apagado); font-size: 10.5px; text-transform: uppercase; }
+pre.saida { background: var(--fundo); border: 1px solid var(--borda);
+            border-radius: 9px; padding: 11px; font-size: 11.5px;
+            overflow-x: auto; white-space: pre; font-family: var(--mono);
+            color: var(--destaque); line-height: 1.55;
+            box-shadow: 0 0 0 1px rgba(56,189,248,.10) inset; }
+.vazio { color: var(--apagado); font-size: 12px; font-style: italic; }
+table.cal td { font-family: var(--mono); font-size: 11.5px; }
+table.cal tr:hover { background: rgba(148,163,184,.05); }
+#estadoGerar { font-family: var(--mono); font-size: 10.5px; }
+.baseAtivo { font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<header>
+  <svg id="robo" viewBox="0 0 48 44" width="36" height="33"
+       title="o robo trabalha enquanto o painel busca os dados">
+    <line class="haste" x1="24" y1="11" x2="24" y2="5"/>
+    <circle class="luz" cx="24" cy="4" r="2.6"/>
+    <rect class="orelha" x="3" y="19" width="3.4" height="9" rx="1.7"/>
+    <rect class="orelha" x="41.6" y="19" width="3.4" height="9" rx="1.7"/>
+    <rect class="cabeca" x="8" y="11" width="32" height="27" rx="9"/>
+    <g class="olhos">
+      <circle class="olho" cx="18" cy="23" r="3.6"/>
+      <circle class="olho" cx="30" cy="23" r="3.6"/>
+    </g>
+    <path class="boca" d="M18.5 30.5 Q24 33.5 29.5 30.5"/>
+  </svg>
+  <h1>TERMINAL GEX</h1>
+  <button id="atualizar">ATUALIZAR REGIOES</button>
+  <button class="fantasma" id="btNiveis">niveis</button>
+  <button class="fantasma" id="btCores">cores</button>
+  <button class="fantasma" id="btTela" title="tela cheia (F11 tambem funciona)">
+    tela cheia</button>
+  <span id="status">clique em atualizar</span>
+</header>
+
+<div class="grade">
+
+  <div class="topo">
+    <div class="caixa ag">
+      <h2>1 &middot; Agenda economica</h2>
+      <div id="agenda"><span class="vazio">aguardando...</span></div>
+      <button class="fantasma" id="btAgenda" style="margin-top:8px;width:100%">
+        ver agenda completa</button>
+    </div>
+
+    <div class="caixa rg">
+      <div id="gexAtivo">NDX</div>
+      <div id="gexValor">--</div>
+      <div id="gexRegime">AGUARDANDO</div>
+      <div id="gexExtra"></div>
+    </div>
+
+    <div class="caixa dc">
+      <h2>3 &middot; Como o market maker tende a agir</h2>
+      <div id="dica"><span class="vazio">aguardando...</span></div>
+    </div>
+
+    <div class="caixa rl">
+      <h2>Relogio</h2>
+      <div class="rlHoras">
+        <div class="rlBloco">
+          <span id="rlAqui">--:--:--</span>
+          <i id="rlAquiFuso">aqui</i>
+        </div>
+        <div class="rlBloco">
+          <span id="rlNY">--:--:--</span>
+          <i>Nova York</i>
+        </div>
+      </div>
+      <div id="sessoes"></div>
+    </div>
+
+    <div class="caixa jr">
+      <h2>Juros 10 anos EUA
+        <select id="selJuros">
+          <option value="1mo">1 mes</option>
+          <option value="3mo" selected>3 meses</option>
+          <option value="6mo">6 meses</option>
+          <option value="1y">1 ano</option>
+        </select>
+      </h2>
+      <div class="jrTopo">
+        <span id="jrAtual">--</span>
+        <span id="jrVar"></span>
+      </div>
+      <svg id="svgJuros" viewBox="0 0 300 92" preserveAspectRatio="none"></svg>
+      <div class="jrPe">
+        <span id="jrMin">min --</span>
+        <span id="jrNota"></span>
+        <span id="jrMax">max --</span>
+      </div>
+    </div>
+
+    <div class="caixa rb">
+      <svg id="roboG" viewBox="0 0 170 132">
+        <g class="anel anelFora">
+          <circle cx="85" cy="62" r="50"/>
+        </g>
+        <g class="anel anelDentro">
+          <circle cx="85" cy="62" r="38"/>
+        </g>
+        <g class="satelites">
+          <circle class="sat" cx="85" cy="12" r="3"/>
+          <circle class="sat" cx="85" cy="112" r="3"/>
+        </g>
+        <line class="haste" x1="85" y1="34" x2="85" y2="22"/>
+        <circle class="luz" cx="85" cy="19" r="4.5"/>
+        <rect class="orelha" x="44" y="56" width="5" height="16" rx="2.5"/>
+        <rect class="orelha" x="121" y="56" width="5" height="16" rx="2.5"/>
+        <rect class="cabeca" x="52" y="34" width="66" height="54" rx="16"/>
+        <g class="olhos">
+          <circle class="olho" cx="70" cy="56" r="6.5"/>
+          <circle class="olho" cx="100" cy="56" r="6.5"/>
+        </g>
+        <path class="boca" d="M70 72 Q85 80 100 72"/>
+      </svg>
+      <div id="balao">pronto</div>
+      <button class="fantasma" id="btVoz" title="ligar ou desligar a voz">
+        voz desligada</button>
+    </div>
+
+    <div class="caixa ex">
+      <h2>9 &middot; Gerar GEX</h2>
+      <div class="gerarGrade">
+        <div class="ativos">
+          <button class="ativo" data-ativo="MNQ">MNQ</button>
+          <button class="ativo" data-ativo="USTEC">USTEC</button>
+          <button class="ativo" data-ativo="US100">US100</button>
+        </div>
+        <div class="plataformas">
+          <label><input type="radio" name="plat" value="mt5"> MT5</label>
+          <label><input type="radio" name="plat" value="ninjatrader"> NINJA TRADER</label>
+          <label><input type="radio" name="plat" value="tradingview"> TRADING VIEW</label>
+          <div class="baseAtivo">
+            <span id="rotuloBase">base</span>
+            <button class="base" id="btBase">FUT</button>
+          </div>
+        </div>
+      </div>
+      <div id="estadoGerar" class="aviso"></div>
+      <button class="fantasma" id="btVer">ver os niveis antes de colar</button>
+    </div>
+  </div>
+
+  <div class="caixa gr">
+    <div class="barraTopo">
+      <select id="selAtivo">
+        <option value="NQ=F">NQ (futuro Nasdaq)</option>
+        <option value="^NDX">NDX (indice Nasdaq)</option>
+        <option value="ES=F">ES (futuro S&amp;P)</option>
+        <option value="^SPX">SPX (indice S&amp;P)</option>
+      </select>
+      <select id="selIntervalo">
+        <option value="15m">15 min</option>
+        <option value="5m">5 min</option>
+        <option value="1h">1 hora</option>
+        <option value="1d">diario</option>
+      </select>
+      <select id="selJanela">
+        <option value="5d">5 dias</option>
+        <option value="1d">1 dia</option>
+        <option value="1mo">1 mes</option>
+      </select>
+      <select id="selDias">
+        <option value="1">vencimento: 0DTE</option>
+        <option value="7">vencimento: semana</option>
+        <option value="30">vencimento: mes</option>
+        <option value="45" selected>vencimento: 45 dias</option>
+      </select>
+      <span id="infoGrafico" class="vazio"></span>
+    </div>
+    <svg id="svgGrafico"></svg>
+    <div class="legenda">
+      <span><i style="background:var(--call_wall)"></i>parede de call</span>
+      <span><i style="background:var(--put_wall)"></i>parede de put</span>
+      <span><i style="background:var(--inversao)"></i>inversao gama</span>
+      <span>linha cheia = nivel exato &middot; tracejada = convertida por proporcao</span>
+    </div>
+  </div>
+
+  <div class="caixa nw">
+    <h2>6 &middot; Noticias</h2>
+    <div id="noticias"><span class="vazio">aguardando...</span></div>
+  </div>
+
+  <div class="caixa mn">
+    <h2>7 &middot; Morning call</h2>
+    <div id="morning"><span class="vazio">aguardando...</span></div>
+  </div>
+
+</div>
+
+<div class="modal" id="modalCal">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Agenda da semana</h2>
+      <button class="fantasma" data-fecha="modalCal">fechar</button>
+    </div>
+    <div id="calCompleto" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<div class="modal" id="modalNiveis">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Niveis por ativo</h2>
+      <button class="fantasma" data-fecha="modalNiveis">fechar</button>
+    </div>
+    <div class="cards" id="cards" style="margin-top:12px">
+      <span class="vazio">aguardando...</span>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalCores">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Cores do terminal</h2>
+      <button class="fantasma" data-fecha="modalCores">fechar</button>
+    </div>
+    <div class="cores" id="listaCores" style="margin-top:12px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button id="btSalvarCores">salvar</button>
+      <button class="fantasma" id="btResetCores">voltar ao padrao</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalExport">
+  <div class="modalCorpo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0" id="tituloExport">Niveis</h2>
+      <button class="fantasma" data-fecha="modalExport">fechar</button>
+    </div>
+    <p class="aviso" id="avisoExport" style="color:var(--apagado);font-size:11.5px"></p>
+    <pre class="saida" id="saidaExport" style="white-space:pre-wrap"></pre>
+    <button id="btCopiar">copiar a linha</button>
+    <p style="color:var(--apagado);font-size:11.5px;margin:12px 0 4px">
+      Cole no campo <b>Cole os Dados Aqui</b> das configuracoes do indicador.
+      Abaixo, os mesmos valores separados, para conferir antes de colar.</p>
+    <div id="tabelaExport"></div>
+  </div>
+</div>
+
+<script>
+const ATIVOS = ["NDX", "SPX", "QQQ", "SPY"];
+const estado = { gamma: {}, cores: {}, grafico: null };
+
+const $ = s => document.querySelector(s);
+const el = (t, c) => { const n = document.createElement(t); if (c) n.className = c; return n; };
+
+function num(v, dec) {
+  if (v === null || v === undefined || isNaN(v)) return "N/A";
+  return Number(v).toLocaleString("pt-BR",
+    { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function dinheiro(v) {
+  if (v === null || v === undefined) return "N/A";
+  const a = Math.abs(v);
+  if (a >= 1e9) return (v / 1e9).toFixed(2) + " B";
+  if (a >= 1e6) return (v / 1e6).toFixed(0) + " M";
+  if (a >= 1e3) return (v / 1e3).toFixed(0) + " K";
+  return v.toFixed(0);
+}
+function hora(ts) {
+  return new Date(ts * 1000).toLocaleTimeString("pt-BR",
+    { hour: "2-digit", minute: "2-digit" });
+}
+function dia(ts) {
+  return new Date(ts * 1000).toLocaleDateString("pt-BR",
+    { day: "2-digit", month: "2-digit" });
+}
+/* Busca uma rota da API traduzindo as falhas para algo acionavel.
+   "Failed to fetch" do navegador quer dizer que a resposta nunca chegou, o
+   que quase sempre e o terminal.py fechado - e nao um erro de calculo. */
+async function pega(url) {
+  let r;
+  try {
+    r = await fetch(url);
+  } catch (e) {
+    throw new Error("sem resposta do terminal.py. Confira se a janela do"
+      + " Python ainda esta aberta e rode python terminal.py de novo");
+  }
+  if (!r.ok) throw new Error("o terminal respondeu HTTP " + r.status
+    + " em " + url.split("?")[0]);
+  try {
+    return await r.json();
+  } catch (e) {
+    throw new Error("o terminal respondeu algo que nao e JSON em "
+      + url.split("?")[0] + ". Veja o erro na janela do Python");
+  }
+}
+
+/* ---------------------------------------------------- 1: agenda */
+const DICA_PESO = {
+  3: "alto impacto - costuma mexer com o indice",
+  2: "impacto medio",
+  1: "baixo impacto",
+  0: "sem impacto definido"
+};
+
+function bolinhas(peso) {
+  const g = el("span", "rel");
+  for (let i = 1; i <= 3; i++) g.appendChild(el("i", i <= peso ? "on" : ""));
+  g.title = DICA_PESO[peso] || DICA_PESO[0];
+  return g;
+}
+
+function linhaEvento(e, passou) {
+  const peso = e.peso || 0;
+  const d = el("div", "ev imp" + peso + (passou ? " passou" : ""));
+  d.appendChild(bolinhas(peso));
+  const h = el("span", "hora"); h.textContent = hora(e.ts);
+  const t = el("span", "tit");
+  t.textContent = (e.moeda ? e.moeda + " " : "") + e.titulo;
+  // o nome original fica na dica, para conferir contra outros calendarios
+  t.title = e.titulo + (e.traduzido ? "\n(" + e.original + ")" : "");
+  const v = el("span", "vals");
+  const partes = [];
+  if (e.previsao) partes.push("prev " + e.previsao);
+  if (e.anterior) partes.push("ant " + e.anterior);
+  v.textContent = partes.join(" / ");
+  d.append(h, t, v);
+  return d;
+}
+
+function mostraAgenda(d) {
+  const alvo = $("#agenda"); alvo.innerHTML = "";
+  if (!d || (!d.antes.length && !d.depois.length)) {
+    alvo.innerHTML = '<span class="vazio">agenda indisponivel agora</span>';
+    return;
+  }
+  d.antes.forEach(e => alvo.appendChild(linhaEvento(e, true)));
+  const marca = el("div", "agora");
+  marca.textContent = "— agora —";
+  alvo.appendChild(marca);
+  d.depois.forEach(e => alvo.appendChild(linhaEvento(e, false)));
+
+  const full = $("#calCompleto"); full.innerHTML = "";
+  if (!d.todos.length) { full.innerHTML = '<span class="vazio">nada</span>'; return; }
+  const tb = el("table", "cal");
+  tb.innerHTML = "<tr><th></th><th>dia</th><th>hora</th><th>moeda</th>"
+               + "<th>evento</th><th>previsao</th><th>anterior</th></tr>";
+  d.todos.forEach(e => {
+    const peso = e.peso || 0;
+    const tr = el("tr", "imp" + peso);
+    if (e.ts <= d.agora) tr.style.opacity = ".45";
+    const dica = e.traduzido ? ' title="' + e.original + '"' : "";
+    tr.innerHTML = "<td></td><td>" + dia(e.ts) + "</td><td>" + hora(e.ts)
+      + "</td><td>" + (e.moeda || "") + "</td><td" + dica + ">" + e.titulo
+      + "</td><td>" + (e.previsao || "") + "</td><td>"
+      + (e.anterior || "") + "</td>";
+    tr.firstChild.appendChild(bolinhas(peso));
+    tb.appendChild(tr);
+  });
+  full.appendChild(tb);
+}
+
+/* ---------------------------------------------------- 2 e 3 */
+// O robozinho do cabecalho serve de sinal de atividade: fenda nos olhos
+// enquanto busca, aceno verde quando acaba, cara fechada se algo falhou.
+let voltaRobo = null;
+const FALA_ROBO = {
+  pensando: "buscando dados...",
+  feliz: "tudo certo",
+  triste: "algo falhou",
+  "": "pronto"
+};
+
+function humorRobo(estado, detalhe) {
+  clearTimeout(voltaRobo);
+  // os dois robos - o pequeno do cabecalho e o grande - andam juntos
+  const robos = [$("#robo"), $("#roboG")].filter(Boolean);
+  robos.forEach(r => {
+    r.classList.remove("pensando", "feliz", "triste");
+    if (estado) r.classList.add(estado);
+  });
+  const balao = $("#balao");
+  if (balao) {
+    balao.textContent = detalhe || FALA_ROBO[estado || ""];
+    balao.classList.toggle("bom", estado === "feliz");
+    balao.classList.toggle("alerta", estado === "triste");
+  }
+  if (estado === "feliz" || estado === "triste") {
+    voltaRobo = setTimeout(() => {
+      robos.forEach(r => r.classList.remove("feliz", "triste"));
+      if (balao) {
+        balao.textContent = FALA_ROBO[""];
+        balao.classList.remove("bom", "alerta");
+      }
+    }, 3200);
+  }
+}
+
+/* ------------------------------------------------- voz do robo
+   Usa a sintese de fala do proprio navegador, que aproveita as vozes
+   instaladas no sistema. Nao baixa nada e funciona sem internet.
+   Vem desligada: voz que fala sem ser chamada irrita mais do que ajuda. */
+const voz = { ligada: false, escolhida: null, disponivel: "speechSynthesis" in window };
+
+function escolheVoz() {
+  if (!voz.disponivel) return;
+  const todas = speechSynthesis.getVoices();
+  if (!todas.length) return;          // a lista chega depois, via evento
+  voz.escolhida = todas.find(v => v.lang === "pt-BR")
+    || todas.find(v => v.lang && v.lang.startsWith("pt"))
+    || null;
+}
+if (voz.disponivel) {
+  escolheVoz();
+  speechSynthesis.addEventListener("voiceschanged", escolheVoz);
+}
+
+function dizer(texto) {
+  if (!voz.ligada || !voz.disponivel || !texto) return;
+  // corta o que estava falando: o aviso novo importa mais que o antigo
+  speechSynthesis.cancel();
+  const f = new SpeechSynthesisUtterance(texto);
+  f.lang = "pt-BR";
+  if (voz.escolhida) f.voice = voz.escolhida;
+  f.rate = 1.05;
+  f.pitch = 1.1;
+  const g = $("#roboG");
+  f.onstart = () => { if (g) g.classList.add("falando"); };
+  f.onend = () => { if (g) g.classList.remove("falando"); };
+  f.onerror = () => { if (g) g.classList.remove("falando"); };
+  speechSynthesis.speak(f);
+}
+
+function pintaBotaoVoz() {
+  const b = $("#btVoz");
+  if (!b) return;
+  if (!voz.disponivel) {
+    b.textContent = "voz indisponivel";
+    b.disabled = true;
+    return;
+  }
+  b.textContent = voz.ligada ? "voz ligada" : "voz desligada";
+  b.classList.toggle("ligada", voz.ligada);
+}
+
+// Monta a frase do regime a partir do que o painel calculou. So fatos:
+// regime, posicao em relacao a inversao e alertas de nivel colado.
+function frasePara(d) {
+  if (!d || d.erro || !d.leitura) return "";
+  const L = d.leitura;
+  const dec = d.spot > 2000 ? 0 : 2;
+  const partes = ["Gama " + (L.regime === "POSITIVO" ? "positivo" : "negativo")
+                  + " no " + d.indice + "."];
+  if (d.zero_gamma) {
+    partes.push("Preco " + (d.spot < d.zero_gamma ? "abaixo" : "acima")
+                + " da inversao, em " + num(d.zero_gamma, dec) + ".");
+  }
+  if (L.alertas && L.alertas.length) partes.push("Atencao: " + L.alertas[0]);
+  return partes.join(" ");
+}
+
+// piscada curta para o olho perceber que o valor mudou
+function piscar(elemento) {
+  if (!elemento) return;
+  elemento.classList.remove("pulso");
+  void elemento.offsetWidth;   // reinicia a animacao
+  elemento.classList.add("pulso");
+}
+
+function mostraRegime(d) {
+  if (!d || d.erro) return;
+  $("#gexAtivo").textContent = d.indice + " - GEX liquido por 1%";
+  const pos = (d.net_gex || 0) > 0;
+  const vv = $("#gexValor");
+  vv.textContent = (pos ? "+" : "") + dinheiro(d.net_gex);
+  vv.className = pos ? "positivo" : "negativo";
+  const rr = $("#gexRegime");
+  rr.textContent = "GAMA " + (pos ? "POSITIVO" : "NEGATIVO");
+  rr.className = pos ? "positivo" : "negativo";
+  // aproveita o espaco da caixa com o que mais importa junto do regime
+  const dec = d.spot > 2000 ? 0 : 2;
+  $("#gexExtra").innerHTML =
+    "<span>spot " + num(d.spot, dec) + "</span>"
+    + "<span>inversao " + num(d.zero_gamma, dec) + "</span>";
+  piscar(vv);
+}
+
+function mostraDica(d) {
+  const alvo = $("#dica"); alvo.innerHTML = "";
+  const L = d && d.leitura;
+  if (!L || !L.frases.length) {
+    alvo.innerHTML = '<span class="vazio">sem dados</span>'; return;
+  }
+  (L.alertas || []).forEach(a => {
+    const x = el("div", "alerta"); x.textContent = a; alvo.appendChild(x);
+  });
+  L.frases.forEach(f => {
+    const p = el("p"); p.textContent = f; alvo.appendChild(p);
+  });
+  const r = el("div", "rodape");
+  r.textContent = "Leitura da mecanica de hedge, nao previsao de preco.";
+  alvo.appendChild(r);
+}
+
+/* ---------------------------------------------------- 4 e 5: grafico */
+function desenhaGrafico(dados) {
+  const svg = $("#svgGrafico");
+  svg.innerHTML = "";
+  const velas = (dados && dados.candles) || [];
+  const niveis = (dados && dados.niveis) || [];
+  if (!velas.length) {
+    const c = svg.getBoundingClientRect();
+    svg.innerHTML = '<text x="' + ((c.width || 900) / 2) + '" y="'
+      + ((c.height || 400) / 2) + '" fill="#94a3b8" font-size="14"'
+      + ' text-anchor="middle">sem candles para mostrar</text>';
+    return;
+  }
+
+  // Desenha no tamanho real do elemento, nao num espaco fixo. Assim o
+  // viewBox bate 1 para 1 com os pixels e nada estica quando a janela muda.
+  const caixa = svg.getBoundingClientRect();
+  const W = Math.max(caixa.width || svg.clientWidth || 900, 420);
+  const H = Math.max(caixa.height || svg.clientHeight || 420, 240);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+  const L = 8, T = 14;
+  const B = H - 26;                  // sobra para o eixo do tempo
+  const R = W - 235;                 // candles
+  const LBL = R + 4;                 // rotulos de preco
+  const PX = W - 182, PR = W - 45;   // perfil de gamma
+  let min = Infinity, max = -Infinity;
+  velas.forEach(v => { min = Math.min(min, v.l); max = Math.max(max, v.h); });
+  niveis.forEach(n => {
+    if (n.preco > min * 0.97 && n.preco < max * 1.03) {
+      min = Math.min(min, n.preco); max = Math.max(max, n.preco);
+    }
+  });
+  const folga = (max - min) * 0.06 || 1;
+  min -= folga; max += folga;
+  const y = p => B - (p - min) / (max - min) * (B - T);
+  const larg = (R - L) / velas.length;
+
+  const ns = "http://www.w3.org/2000/svg";
+  const add = (tag, attrs, texto) => {
+    const n = document.createElementNS(ns, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (texto !== undefined) n.textContent = texto;
+    svg.appendChild(n); return n;
+  };
+
+  // grade de preco
+  for (let i = 0; i <= 4; i++) {
+    const p = min + (max - min) * i / 4;
+    add("line", { x1: L, y1: y(p), x2: R, y2: y(p),
+                  stroke: "rgba(148,163,184,.12)", "stroke-width": 1 });
+    add("text", { x: LBL, y: y(p) + 4, fill: "#94a3b8", "font-size": 10 },
+        num(p, p > 2000 ? 0 : 2));
+  }
+
+  // candles
+  velas.forEach((v, i) => {
+    const cx = L + i * larg + larg / 2;
+    const sobe = v.c >= v.o;
+    const cor = sobe ? getCor("alta") : getCor("baixa");
+    add("line", { x1: cx, y1: y(v.h), x2: cx, y2: y(v.l),
+                  stroke: cor, "stroke-width": 1 });
+    const altura = Math.max(Math.abs(y(v.o) - y(v.c)), 1);
+    add("rect", { x: cx - Math.max(larg * 0.32, 0.7),
+                  y: Math.min(y(v.o), y(v.c)),
+                  width: Math.max(larg * 0.64, 1.4), height: altura,
+                  fill: cor });
+  });
+
+  // ultimo preco
+  const ult = velas[velas.length - 1].c;
+  add("line", { x1: L, y1: y(ult), x2: R, y2: y(ult),
+                stroke: getCor("destaque"), "stroke-width": 1,
+                "stroke-dasharray": "2 3", opacity: .9 });
+  add("text", { x: L + 3, y: y(ult) - 4, fill: getCor("destaque"),
+                "font-size": 11, "font-weight": "bold" }, num(ult, 2));
+
+  // niveis de gamma
+  niveis.forEach(n => {
+    if (n.preco < min || n.preco > max) return;
+    const cor = getCor(n.cor);
+    add("line", { x1: L, y1: y(n.preco), x2: R, y2: y(n.preco),
+                  stroke: cor, "stroke-width": n.exato ? 1.6 : 1,
+                  "stroke-dasharray": n.exato ? "" : "5 4",
+                  opacity: n.exato ? .95 : .55 });
+    add("text", { x: L + 4, y: y(n.preco) - 3, fill: cor,
+                  "font-size": 9.5,
+                  "font-weight": n.exato ? "bold" : "normal" },
+        n.rotulo + "  " + num(n.preco, 0));
+  });
+
+  // perfil de gamma lateral
+  const barras = (estado.gamma[dados.base] && estado.gamma[dados.base].barras) || [];
+  if (barras.length) {
+    let maior = 0;
+    barras.forEach(b => maior = Math.max(maior, Math.abs(b.v)));
+    const fator = dados.fator || 1, desvio = dados.desvio || 0;
+    add("text", { x: PX, y: T - 2, fill: "#94a3b8", "font-size": 9.5 },
+        "perfil de gamma");
+    barras.forEach(b => {
+      const preco = b.k * fator + desvio;
+      if (preco < min || preco > max || !maior) return;
+      const w = Math.abs(b.v) / maior * (PR - PX);
+      add("rect", { x: PX, y: y(preco) - 2.4, width: Math.max(w, 0.6),
+                    height: 4.8,
+                    fill: b.v > 0 ? getCor("alta") : getCor("baixa"),
+                    opacity: .8 });
+    });
+    add("line", { x1: PX, y1: T, x2: PX, y2: B,
+                  stroke: "rgba(148,163,184,.3)", "stroke-width": 1 });
+  }
+
+  // eixo do tempo
+  const passo = Math.max(1, Math.floor(velas.length / 6));
+  for (let i = 0; i < velas.length; i += passo) {
+    const d = new Date(velas[i].t * 1000);
+    add("text", { x: L + i * larg, y: B + 16, fill: "#94a3b8", "font-size": 9.5 },
+        d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+  }
+}
+
+function getCor(nome) {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue("--" + nome).trim() || "#888";
+}
+
+/* ---------------------------------------------------- relogio e sessoes
+   Os horarios de cada praca sao calculados no fuso dela, usando o proprio
+   navegador para a conversao. Assim nao e preciso tratar horario de verao a
+   mao: quando os Estados Unidos mudam e o Brasil nao, a conta acompanha. */
+const PRACAS = [
+  { nome: "Nova York", fuso: "America/New_York", abre: 9.5,  fecha: 16 },
+  { nome: "Sao Paulo", fuso: "America/Sao_Paulo", abre: 10,  fecha: 17 },
+  { nome: "Londres",   fuso: "Europe/London",     abre: 8,   fecha: 16.5 },
+  { nome: "Frankfurt", fuso: "Europe/Berlin",     abre: 9,   fecha: 17.5 },
+  { nome: "Toquio",    fuso: "Asia/Tokyo",        abre: 9,   fecha: 15 },
+];
+
+function horaNoFuso(fuso) {
+  const agora = new Date();
+  const txt = agora.toLocaleString("en-US", { timeZone: fuso, hour12: false,
+    hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "short" });
+  // vem como "Mon, 14:32:07"
+  const partes = txt.split(", ");
+  const dia = partes[0];
+  const [h, m, s] = partes[partes.length - 1].split(":").map(Number);
+  return { dia: dia, h: h % 24, m: m, s: s, decimal: (h % 24) + m / 60 + s / 3600 };
+}
+
+function relogioTexto(fuso) {
+  return new Date().toLocaleTimeString("pt-BR", { timeZone: fuso,
+    hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function faltaPara(horas) {
+  const total = Math.round(horas * 60);
+  const h = Math.floor(total / 60), m = total % 60;
+  return h > 0 ? h + "h" + String(m).padStart(2, "0") : m + "min";
+}
+
+function mostraSessoes() {
+  const alvo = $("#sessoes");
+  if (!alvo) return;
+  let html = "";
+  PRACAS.forEach(p => {
+    const t = horaNoFuso(p.fuso);
+    const fimDeSemana = t.dia === "Sat" || t.dia === "Sun";
+    const aberta = !fimDeSemana && t.decimal >= p.abre && t.decimal < p.fecha;
+    let feito = 0, nota = "";
+    if (fimDeSemana) {
+      nota = "fim de semana";
+    } else if (aberta) {
+      feito = (t.decimal - p.abre) / (p.fecha - p.abre) * 100;
+      nota = "fecha em " + faltaPara(p.fecha - t.decimal);
+    } else if (t.decimal < p.abre) {
+      nota = "abre em " + faltaPara(p.abre - t.decimal);
+    } else {
+      nota = "fechou";
+    }
+    html += '<div class="ses' + (aberta ? " aberta" : "") + '">'
+      + '<div class="sesTopo"><b>' + p.nome + "</b><span>" + nota
+      + "</span></div>"
+      + '<div class="sesBarra"><i style="width:' + feito.toFixed(0)
+      + '%"></i></div></div>';
+  });
+  alvo.innerHTML = html;
+}
+
+function tiqueRelogio() {
+  const aqui = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  $("#rlAqui").textContent = relogioTexto(aqui);
+  $("#rlNY").textContent = relogioTexto("America/New_York");
+  const curto = (aqui || "").split("/").pop().replace(/_/g, " ");
+  $("#rlAquiFuso").textContent = curto || "aqui";
+  mostraSessoes();
+}
+tiqueRelogio();
+setInterval(tiqueRelogio, 1000);
+
+/* ---------------------------------------------------- tela cheia */
+$("#btTela").addEventListener("click", () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen().catch(() => { });
+  }
+});
+document.addEventListener("fullscreenchange", () => {
+  const cheia = !!document.fullscreenElement;
+  $("#btTela").textContent = cheia ? "sair da tela cheia" : "tela cheia";
+  // o grafico desenha no tamanho real, entao precisa refazer
+  setTimeout(() => {
+    if (estado.grafico) desenhaGrafico(estado.grafico);
+    if (estado.juros) desenhaJuros(estado.juros);
+  }, 150);
+});
+
+/* ---------------------------------------------------- juros 10 anos */
+function desenhaJuros(d) {
+  const svg = $("#svgJuros");
+  svg.innerHTML = "";
+  const pts = (d && d.pontos) || [];
+  if (pts.length < 2) {
+    svg.innerHTML = '<text x="150" y="48" fill="#94a3b8" font-size="11"'
+      + ' text-anchor="middle">sem dados de juros</text>';
+    return;
+  }
+  const L = 2, R = 298, T = 8, B = 84;
+  let min = Math.min(...pts.map(p => p.v));
+  let max = Math.max(...pts.map(p => p.v));
+  const folga = (max - min) * 0.12 || 0.05;
+  min -= folga; max += folga;
+  const x = i => L + (R - L) * i / (pts.length - 1);
+  const y = v => B - (v - min) / (max - min) * (B - T);
+
+  const ns = "http://www.w3.org/2000/svg";
+  const add = (tag, attrs) => {
+    const n = document.createElementNS(ns, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    svg.appendChild(n);
+    return n;
+  };
+
+  // sobe ou desce no periodo decide a cor: juro em alta pressiona a bolsa
+  const subiu = pts[pts.length - 1].v >= pts[0].v;
+  const cor = subiu ? getCor("baixa") : getCor("alta");
+
+  // area preenchida embaixo da linha, com degrade
+  const grad = document.createElementNS(ns, "linearGradient");
+  grad.setAttribute("id", "gradJuros");
+  grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
+  grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
+  grad.innerHTML = '<stop offset="0" stop-color="' + cor
+    + '" stop-opacity=".35"/><stop offset="1" stop-color="' + cor
+    + '" stop-opacity="0"/>';
+  svg.appendChild(grad);
+
+  let linha = "";
+  pts.forEach((p, i) => {
+    linha += (i ? " L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1);
+  });
+  add("path", { d: linha + " L" + R + " " + B + " L" + L + " " + B + " Z",
+                fill: "url(#gradJuros)" });
+  add("path", { d: linha, fill: "none", stroke: cor, "stroke-width": 1.8,
+                "stroke-linejoin": "round" });
+
+  // ponto e linha no valor atual
+  const ultimo = pts[pts.length - 1];
+  add("line", { x1: L, y1: y(ultimo.v), x2: R, y2: y(ultimo.v), stroke: cor,
+                "stroke-width": .8, "stroke-dasharray": "2 3", opacity: .45 });
+  add("circle", { cx: x(pts.length - 1), cy: y(ultimo.v), r: 3, fill: cor });
+}
+
+async function carregaJuros() {
+  const janela = $("#selJuros").value;
+  try {
+    const d = await pega("/api/juros?janela=" + janela);
+    if (d.erro) {
+      $("#jrAtual").textContent = "--";
+      $("#jrNota").textContent = d.erro;
+      desenhaJuros(null);
+      return d;
+    }
+    estado.juros = d;
+    const subiu = d.variacao >= 0;
+    $("#jrAtual").textContent = num(d.atual, 3) + "%";
+    $("#jrAtual").className = subiu ? "negativo" : "positivo";
+    $("#jrVar").textContent = (subiu ? "+" : "") + num(d.variacao, 3)
+      + " no dia";
+    $("#jrVar").className = subiu ? "negativo" : "positivo";
+    $("#jrMin").textContent = "min " + num(d.minimo, 2);
+    $("#jrMax").textContent = "max " + num(d.maximo, 2);
+    // leitura de mecanica, nao de direcao: juro alto encarece o futuro das
+    // empresas de tecnologia, que e o peso do Nasdaq
+    const noPeriodo = d.atual - d.primeiro;
+    $("#jrNota").textContent = Math.abs(noPeriodo) < 0.03
+      ? "estavel no periodo"
+      : (noPeriodo > 0 ? "em alta: pressiona tech" : "em queda: alivia tech");
+    desenhaJuros(d);
+    piscar($("#jrAtual"));
+    return d;
+  } catch (e) {
+    $("#jrNota").textContent = "falhou: " + e.message;
+    return null;
+  }
+}
+
+/* ---------------------------------------------------- 6: noticias */
+function mostraNoticias(d) {
+  const alvo = $("#noticias"); alvo.innerHTML = "";
+  const lista = (d && d.noticias) || [];
+  if (!lista.length) {
+    alvo.innerHTML = '<span class="vazio">noticias indisponiveis agora</span>';
+    return;
+  }
+  lista.forEach(n => {
+    const peso = n.peso || 1;
+    const c = el("div", "nt peso" + peso);
+    const m = el("div", "meta");
+    // bolinhas de relevancia: tres para o que mexe com o indice inteiro
+    const bolas = bolinhas(peso);
+    bolas.title = peso === 3 ? "mexe com o mercado todo"
+                : peso === 2 ? "mexe com um setor ou empresa grande"
+                : "assunto geral";
+    m.appendChild(bolas);
+    const txt = el("span");
+    txt.textContent = n.fonte + (n.ts ? "  -  " + dia(n.ts) + " " + hora(n.ts) : "");
+    m.appendChild(txt);
+    if (n.traduzido) {
+      const tag = el("span", "trad");
+      tag.textContent = "traduzido";
+      m.appendChild(tag);
+    }
+    const t = el("div", "tl"); t.textContent = n.titulo;
+    const r = el("div", "rs");
+    r.textContent = n.resumo || "(sem resumo)";
+    if (n.traduzido && n.original) {
+      const o = el("div");
+      o.textContent = "original: " + n.original;
+      o.style.cssText = "margin-top:5px;font-style:italic;opacity:.7";
+      r.appendChild(o);
+    }
+    if (n.link) {
+      const a = el("a");
+      a.href = n.link; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "abrir materia";
+      a.style.color = "var(--destaque)";
+      a.style.fontSize = "11px";
+      r.appendChild(el("br")); r.appendChild(a);
+    }
+    c.append(m, t, r);
+    c.addEventListener("click", ev => {
+      if (ev.target.tagName !== "A") c.classList.toggle("aberta");
+    });
+    alvo.appendChild(c);
+  });
+}
+
+/* ---------------------------------------------------- 7: morning call */
+function mostraMorning(d) {
+  const alvo = $("#morning"); alvo.innerHTML = "";
+  const blocos = (d && d.blocos) || [];
+  if (!blocos.length) {
+    alvo.innerHTML = '<span class="vazio">sem dados</span>'; return;
+  }
+  blocos.forEach(b => {
+    const c = el("div", "mc");
+    const t = el("div", "t"); t.textContent = b.titulo;
+    const v = el("div", "v"); v.textContent = b.texto;
+    c.append(t, v); alvo.appendChild(c);
+  });
+  if (d.aviso) {
+    const r = el("div", "rodape"); r.textContent = d.aviso;
+    alvo.appendChild(r);
+  }
+}
+
+/* ---------------------------------------------------- 8: cards */
+function montaCard(d) {
+  const c = el("div", "card");
+  if (d.erro) {
+    c.innerHTML = '<div class="tic">' + (d.indice || "?") + "</div>"
+      + '<div class="sub">' + d.erro + "</div>";
+    return c;
+  }
+  const dec = d.spot > 2000 ? 0 : 2;
+  const pos = (d.net_gex || 0) > 0;
+  const cab = el("div", "cab");
+  cab.innerHTML = '<div><div class="tic">' + d.indice + "</div>"
+    + '<div class="sub">' + d.contratos + " contratos &middot; "
+    + d.dias_max + "d</div></div>"
+    + '<span class="selo ' + (pos ? "pos" : "neg") + '">GAMA '
+    + (pos ? "POSITIVO" : "NEGATIVO") + "</span>";
+  c.appendChild(cab);
+
+  const lin = (rot, val, cor) => {
+    const l = el("div", "lin");
+    l.innerHTML = "<span>" + rot + "</span><b"
+      + (cor ? ' style="color:var(--' + cor + ')"' : "") + ">" + val + "</b>";
+    return l;
+  };
+  c.appendChild(lin("Spot", num(d.spot, dec)));
+  c.appendChild(lin("Inversao gama", num(d.zero_gamma, dec), "inversao"));
+  c.appendChild(lin("Parede de call", num(d.call_wall, dec), "call_wall"));
+  c.appendChild(lin("Parede de put", num(d.put_wall, dec), "put_wall"));
+  c.appendChild(lin("GEX liquido", "US$ " + dinheiro(d.net_gex)));
+
+  if (d.futuro) {
+    const f = d.futuro, w = el("div", "fut");
+    w.appendChild(lin("<b>" + f.nome + "</b> (basis " + num(f.basis, 2) + ")",
+                      num(f.preco, 2)));
+    w.appendChild(lin("Inversao gama", num(f.zero_gamma, 0), "inversao"));
+    w.appendChild(lin("Parede de call", num(f.call_wall, 0), "call_wall"));
+    w.appendChild(lin("Parede de put", num(f.put_wall, 0), "put_wall"));
+    c.appendChild(w);
+  }
+  return c;
+}
+
+function mostraCards() {
+  const alvo = $("#cards"); alvo.innerHTML = "";
+  ATIVOS.forEach(a => {
+    const d = estado.gamma[a];
+    if (d) alvo.appendChild(montaCard(d));
+  });
+  if (!alvo.children.length) {
+    alvo.innerHTML = '<span class="vazio">aguardando...</span>';
+  }
+}
+
+/* ---------------------------------------------------- grafico: buscar */
+async function carregaGrafico() {
+  const simbolo = $("#selAtivo").value;
+  const intervalo = $("#selIntervalo").value;
+  const janela = $("#selJanela").value;
+  $("#infoGrafico").textContent = "buscando candles...";
+  try {
+    const d = await pega("/api/candles?simbolo=" + encodeURIComponent(simbolo)
+      + "&intervalo=" + intervalo + "&janela=" + janela);
+    // base e fator usados pelo perfil lateral
+    const ehNasdaq = simbolo === "NQ=F" || simbolo === "^NDX";
+    d.base = ehNasdaq ? "NDX" : "SPX";
+    const principal = estado.gamma[d.base];
+    d.fator = 1;
+    d.desvio = (simbolo.endsWith("=F") && principal && principal.futuro)
+      ? principal.futuro.basis : 0;
+    estado.grafico = d;
+    desenhaGrafico(d);
+    $("#infoGrafico").textContent = d.candles.length + " candles  -  "
+      + d.niveis.length + " niveis";
+  } catch (e) {
+    $("#infoGrafico").textContent = "falhou: " + e.message;
+  }
+}
+
+/* ---------------------------------------------------- cores */
+async function carregaConfig() {
+  try {
+    const cfg = await pega("/api/config");
+    estado.cores = cfg.cores || {};
+    aplicaCores(estado.cores);
+    if (cfg.dias_max) $("#selDias").value = String(cfg.dias_max);
+    if (cfg.grafico) $("#selAtivo").value = cfg.grafico;
+    estado.ativos = cfg.ativos || {};
+    const plat = cfg.plataforma || "mt5";
+    const marca = document.querySelector("input[name=plat][value=" + plat + "]");
+    if (marca) marca.checked = true;
+    mostraBaseDoAtivo();
+  } catch (e) { }
+}
+
+function pintaBase(botao, valor) {
+  botao.textContent = valor === "indice" ? "IDX" : "FUT";
+  botao.classList.toggle("fut", valor !== "indice");
+  botao.classList.toggle("idx", valor === "indice");
+  botao.dataset.valor = valor;
+}
+
+function aplicaCores(cores) {
+  for (const k in cores) {
+    document.documentElement.style.setProperty("--" + k, cores[k]);
+  }
+}
+function montaEditorCores() {
+  const alvo = $("#listaCores"); alvo.innerHTML = "";
+  const rotulos = {
+    fundo: "fundo", painel: "painel", borda: "borda", texto: "texto",
+    apagado: "texto apagado", alta: "alta", baixa: "baixa",
+    call_wall: "parede de call", put_wall: "parede de put",
+    inversao: "inversao gama", destaque: "destaque", botao: "botao"
+  };
+  for (const k in rotulos) {
+    const d = el("div", "cor");
+    const i = el("input"); i.type = "color"; i.dataset.chave = k;
+    i.value = (estado.cores[k] || getCor(k) || "#000000").slice(0, 7);
+    const s = el("span"); s.textContent = rotulos[k];
+    d.append(i, s); alvo.appendChild(d);
+    i.addEventListener("input", () => {
+      document.documentElement.style.setProperty("--" + k, i.value);
+      if (estado.grafico) desenhaGrafico(estado.grafico);
+    });
+  }
+}
+
+/* ---------------------------------------------------- 9: exportar */
+async function textoNiveis(ativo, plataforma) {
+  const simbolo = $("#selAtivo").value;
+  const dias = $("#selDias").value;
+  const d = await pega("/api/exportar?ativo=" + encodeURIComponent(ativo)
+    + "&plataforma=" + plataforma
+    + "&simbolo=" + encodeURIComponent(simbolo) + "&dias=" + dias);
+  if (d.erro) return { corpo: "", erro: d.erro, vazio: true };
+  return {
+    corpo: d.linha || "", aviso: d.aviso || "", vazio: !d.linha,
+    valores: d.valores || {}, info: d
+  };
+}
+
+const NOMES_PLATAFORMA = {
+  mt5: "MetaTrader 5", tradingview: "TradingView", ninjatrader: "NinjaTrader"
+};
+
+async function exportar(ativo, plataforma) {
+  $("#tituloExport").textContent = ativo + " para "
+    + (NOMES_PLATAFORMA[plataforma] || plataforma);
+  $("#avisoExport").textContent = "gerando...";
+  $("#saidaExport").textContent = "";
+  $("#tabelaExport").innerHTML = "";
+  $("#modalExport").classList.add("on");
+
+  const d = await textoNiveis(ativo, plataforma);
+  if (d.erro) {
+    $("#avisoExport").textContent = d.erro;
+    return;
+  }
+
+  const i = d.info;
+  const partes = ["niveis de " + i.indice,
+                  i.contratos + " contratos",
+                  "vencimento " + i.dias + "d"];
+  if (i.base === "indice") {
+    partes.push("base: INDICE a vista (" + num(i.spot, 2) + ", sem basis)");
+  } else if (i.preco_futuro) {
+    partes.push("base: FUTURO (" + num(i.preco_futuro, 2)
+                + ", basis " + num(i.basis, 2) + ")");
+  }
+  if (i.contratos_0dte) partes.push(i.contratos_0dte + " contratos 0DTE");
+  $("#avisoExport").textContent = partes.join("  -  ")
+    + (d.aviso ? "   |   " + d.aviso : "");
+  $("#saidaExport").textContent = d.corpo
+    || "sem niveis - clique em ATUALIZAR REGIOES primeiro";
+
+  // tabela de conferencia, para bater os numeros antes de colar
+  const chaves = Object.keys(d.valores);
+  if (chaves.length) {
+    const t = el("table", "cal");
+    t.innerHTML = "<tr><th>campo</th><th>valor</th></tr>";
+    chaves.forEach(k => {
+      const tr = el("tr");
+      tr.innerHTML = "<td>" + k + "</td><td><b>"
+        + num(d.valores[k], 2) + "</b></td>";
+      t.appendChild(tr);
+    });
+    $("#tabelaExport").appendChild(t);
+  }
+}
+
+/* ---------------------------------------------------- atualizar tudo */
+async function atualizarTudo() {
+  const bt = $("#atualizar");
+  bt.disabled = true;
+  humorRobo("pensando");
+  let falhas = 0;
+  const t0 = Date.now();
+  const dias = $("#selDias").value;
+  const passos = [];
+
+  passos.push(["panorama", async () => {
+    const d = await pega("/api/panorama"); return d;
+  }]);
+  passos.push(["agenda", async () => {
+    const d = await pega("/api/calendario"); mostraAgenda(d); return d;
+  }]);
+  passos.push(["juros 10 anos", carregaJuros]);
+  passos.push(["noticias", async () => {
+    const d = await pega("/api/noticias"); mostraNoticias(d); return d;
+  }]);
+  ATIVOS.forEach(a => passos.push([a, async () => {
+    const d = await pega("/api/gamma?simbolo=" + a + "&dias=" + dias);
+    estado.gamma[a] = d;
+    mostraCards();
+    if (a === "NDX") { mostraRegime(d); mostraDica(d); }
+    return d;
+  }]));
+  passos.push(["grafico", carregaGrafico]);
+  passos.push(["morning call", async () => {
+    const d = await pega("/api/morningcall"); mostraMorning(d); return d;
+  }]);
+
+  for (let i = 0; i < passos.length; i++) {
+    const [nome, fn] = passos[i];
+    $("#status").textContent = "buscando " + nome + "  (" + (i + 1)
+      + "/" + passos.length + ")";
+    // o robo grande vai narrando a etapa
+    humorRobo("pensando", nome + "  " + (i + 1) + "/" + passos.length);
+    try { await fn(); } catch (e) {
+      falhas++;
+      console.warn(nome, e);
+    }
+  }
+  const seg = ((Date.now() - t0) / 1000).toFixed(0);
+  $("#status").textContent = "atualizado as "
+    + new Date().toLocaleTimeString("pt-BR") + "  (" + seg + "s"
+    + (falhas ? ", " + falhas + " com falha" : "") + ")";
+
+  // o robo resume o resultado no balao e, se a voz estiver ligada, fala
+  const ndx = estado.gamma.NDX;
+  const frase = frasePara(ndx);
+  if (falhas) {
+    humorRobo("triste", falhas + " de " + passos.length + " etapas falharam");
+    dizer("Atencao: " + falhas + " etapas falharam na atualizacao.");
+  } else if (frase) {
+    const L = ndx.leitura;
+    humorRobo(L.alertas && L.alertas.length ? "triste" : "feliz",
+              L.titulo + (L.alertas && L.alertas.length
+                          ? " - " + L.alertas[0] : ""));
+    dizer(frase);
+  } else {
+    humorRobo("feliz");
+    dizer("Atualizacao concluida.");
+  }
+  bt.disabled = false;
+}
+
+/* ---------------------------------------------------- eventos */
+$("#atualizar").addEventListener("click", atualizarTudo);
+$("#btAgenda").addEventListener("click", () => $("#modalCal").classList.add("on"));
+$("#btNiveis").addEventListener("click", () => $("#modalNiveis").classList.add("on"));
+$("#btCores").addEventListener("click", () => {
+  montaEditorCores(); $("#modalCores").classList.add("on");
+});
+document.querySelectorAll("[data-fecha]").forEach(b => {
+  b.addEventListener("click", () => $("#" + b.dataset.fecha).classList.remove("on"));
+});
+document.querySelectorAll(".modal").forEach(m => {
+  m.addEventListener("click", e => { if (e.target === m) m.classList.remove("on"); });
+});
+$("#btSalvarCores").addEventListener("click", async () => {
+  const cores = {};
+  document.querySelectorAll("#listaCores input[type=color]").forEach(i => {
+    cores[i.dataset.chave] = i.value;
+  });
+  estado.cores = cores;
+  await fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cores: cores, dias_max: Number($("#selDias").value),
+                           grafico: $("#selAtivo").value })
+  });
+  $("#modalCores").classList.remove("on");
+});
+$("#btResetCores").addEventListener("click", async () => {
+  // quem sabe as cores padrao e o servidor; aqui so pedimos o reset, para
+  // nao manter uma segunda copia da paleta que poderia ficar desatualizada
+  await fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reset_cores: true })
+  });
+  location.reload();
+});
+["selAtivo", "selIntervalo", "selJanela"].forEach(id => {
+  $("#" + id).addEventListener("change", carregaGrafico);
+});
+$("#selJuros").addEventListener("change", carregaJuros);
+$("#selDias").addEventListener("change", () => {
+  $("#status").textContent = "vencimento alterado - clique em atualizar";
+});
+function plataformaAtual() {
+  const m = document.querySelector("input[name=plat]:checked");
+  return m ? m.value : "mt5";
+}
+
+function ativoFoco() {
+  return estado.ultimoAtivo || "MNQ";
+}
+
+// Clicar no ativo gera a linha e copia na hora, sem passo intermediario.
+async function gerarECopiar(ativo, botao) {
+  const plataforma = plataformaAtual();
+  const estadoTxt = $("#estadoGerar");
+  const antes = botao.textContent;
+  estado.ultimoAtivo = ativo;
+  botao.disabled = true;
+  estadoTxt.textContent = "gerando " + ativo + "...";
+  try {
+    const d = await textoNiveis(ativo, plataforma);
+    if (d.erro) {
+      estadoTxt.textContent = d.erro;
+    } else if (d.vazio) {
+      estadoTxt.textContent = "sem niveis - clique em ATUALIZAR REGIOES primeiro";
+    } else {
+      await navigator.clipboard.writeText(d.corpo);
+      botao.textContent = "COPIADO";
+      botao.classList.add("ok");
+      setTimeout(() => {
+        botao.textContent = antes;
+        botao.classList.remove("ok");
+      }, 1800);
+      const i = d.info;
+      estadoTxt.textContent = i.ativo + " para " + NOMES_PLATAFORMA[i.plataforma]
+        + ", base " + (i.base === "indice" ? "indice" : "futuro")
+        + " - cole no indicador";
+      piscar(estadoTxt);
+      humorRobo("feliz", "niveis do " + i.ativo + " copiados");
+      dizer("Niveis do " + i.ativo + " copiados.");
+    }
+  } catch (e) {
+    estadoTxt.textContent = "falhou: " + e.message;
+  }
+  botao.disabled = false;
+  mostraBaseDoAtivo();
+}
+
+// MNQ e contrato futuro, nao tem ambiguidade. USTEC e US100 sao CFD: a
+// corretora decide se espelham o futuro ou o indice, entao o botao de base
+// vale para esses dois.
+function mostraBaseDoAtivo() {
+  const cfd = (estado.ativos || {}).USTEC || "futuro";
+  pintaBase($("#btBase"), cfd);
+  $("#rotuloBase").textContent = "base dos CFD";
+}
+
+document.querySelectorAll("button.ativo").forEach(b => {
+  b.addEventListener("click", () => gerarECopiar(b.dataset.ativo, b));
+});
+
+document.querySelectorAll("input[name=plat]").forEach(r => {
+  r.addEventListener("change", () => {
+    fetch("/api/config", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plataforma: r.value })
+    }).catch(() => { });
+    $("#estadoGerar").textContent = "plataforma: " + NOMES_PLATAFORMA[r.value];
+  });
+});
+
+$("#btBase").addEventListener("click", () => {
+  const novo = $("#btBase").dataset.valor === "indice" ? "futuro" : "indice";
+  estado.ativos = estado.ativos || {};
+  estado.ativos.USTEC = novo;
+  estado.ativos.US100 = novo;
+  pintaBase($("#btBase"), novo);
+  fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ativos: { USTEC: novo, US100: novo } })
+  }).catch(() => { });
+  $("#estadoGerar").textContent = "CFD agora na base "
+    + (novo === "indice" ? "indice" : "futuro") + " - gere de novo";
+});
+
+$("#btVer").addEventListener("click", () => exportar(ativoFoco(), plataformaAtual()));
+
+$("#btVoz").addEventListener("click", () => {
+  voz.ligada = !voz.ligada;
+  pintaBotaoVoz();
+  if (voz.ligada) {
+    escolheVoz();
+    dizer("Voz ligada.");
+  } else {
+    speechSynthesis.cancel();
+  }
+});
+pintaBotaoVoz();
+$("#btCopiar").addEventListener("click", () => {
+  navigator.clipboard.writeText($("#saidaExport").textContent);
+  $("#btCopiar").textContent = "copiado!";
+  setTimeout(() => $("#btCopiar").textContent = "copiar", 1500);
+});
+// redesenha quando a janela muda de tamanho, com uma pausa para nao
+// recalcular a cada pixel durante o arrasto
+let aguardaResize = null;
+window.addEventListener("resize", () => {
+  clearTimeout(aguardaResize);
+  aguardaResize = setTimeout(() => {
+    if (estado.grafico) desenhaGrafico(estado.grafico);
+    if (estado.juros) desenhaJuros(estado.juros);
+  }, 120);
+});
+
+carregaConfig().then(atualizarTudo);
+</script>
+</body>
+</html>

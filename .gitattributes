@@ -1,0 +1,8 @@
+# Os .bat rodam no Windows e precisam de CRLF. Sem isto, quem clonar em outro
+# sistema operacional recebe LF e o cmd pode engasgar em rotulo e em bloco
+# entre parenteses.
+*.bat text eol=crlf
+
+# Binarios: nada de conversao de fim de linha.
+*.ico binary
+*.png binary
