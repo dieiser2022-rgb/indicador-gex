@@ -828,10 +828,25 @@ function dia(ts) {
   return new Date(ts * 1000).toLocaleDateString("pt-BR",
     { day: "2-digit", month: "2-digit" });
 }
+/* Busca uma rota da API traduzindo as falhas para algo acionavel.
+   "Failed to fetch" do navegador quer dizer que a resposta nunca chegou, o
+   que quase sempre e o terminal.py fechado - e nao um erro de calculo. */
 async function pega(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  return r.json();
+  let r;
+  try {
+    r = await fetch(url);
+  } catch (e) {
+    throw new Error("sem resposta do terminal.py. Confira se a janela do"
+      + " Python ainda esta aberta e rode python terminal.py de novo");
+  }
+  if (!r.ok) throw new Error("o terminal respondeu HTTP " + r.status
+    + " em " + url.split("?")[0]);
+  try {
+    return await r.json();
+  } catch (e) {
+    throw new Error("o terminal respondeu algo que nao e JSON em "
+      + url.split("?")[0] + ". Veja o erro na janela do Python");
+  }
 }
 
 /* ---------------------------------------------------- 1: agenda */

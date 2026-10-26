@@ -9,6 +9,7 @@ Abre o navegador em http://localhost:8777
 import json
 import os
 import threading
+import traceback
 import types
 import webbrowser
 from datetime import datetime, timezone
@@ -481,7 +482,11 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 self._json(fn(args))
             except Exception as e:
-                self._json({"erro": str(e)}, 200)
+                # Imprime o rastro completo na janela do Python. Sem isso a
+                # causa real se perde: o navegador recebe so a frase curta.
+                print("  ! erro em", nome)
+                traceback.print_exc()
+                self._json({"erro": type(e).__name__ + ": " + str(e)}, 200)
             return
 
         self._envia(404, "nao encontrado", "text/plain")
@@ -503,7 +508,21 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     endereco = "http://localhost:" + str(PORTA)
-    servidor = ThreadingHTTPServer(("127.0.0.1", PORTA), Handler)
+    try:
+        servidor = ThreadingHTTPServer(("127.0.0.1", PORTA), Handler)
+    except OSError as e:
+        # Porta ocupada e o caso mais comum: sobrou um terminal.py de antes.
+        # Sem esta mensagem o script morre com um erro de numero, e a pagina
+        # velha do navegador fica falhando sem explicacao.
+        print("")
+        print("Nao consegui abrir a porta", PORTA, "-", e)
+        print("")
+        print("Quase sempre e um terminal.py que ficou aberto de antes.")
+        print("Feche as outras janelas do Python e rode de novo. Para achar")
+        print("e encerrar o que esta na porta, no prompt do Windows:")
+        print("   netstat -ano | findstr 8777")
+        print("   taskkill /PID <o numero da ultima coluna> /F")
+        return
     print("Terminal GEX no ar em", endereco)
     print("para parar: CTRL+C")
     threading.Timer(1.0, lambda: webbrowser.open(endereco)).start()
