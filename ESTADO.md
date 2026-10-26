@@ -45,11 +45,28 @@ apareceu como um cmd comum. A correção foi apontar o atalho para o
 `python.exe` com `abrir.py` como argumento — aí o ícone é respeitado. Por isso
 a lógica de partida mora no `abrir.py`, e o `GEX.bat` virou só um chamador.
 
-O `CRIAR_ATALHO.bat` descobre o caminho do executável por
-`python -c "import sys;print(sys.executable)"`, que funciona igual se o
-comando do usuário for `python` ou `py`. As aspas dos argumentos do atalho são
-montadas com `[char]34` no PowerShell, para não virar um festival de barras
-invertidas dentro do `cmd`.
+**Segunda armadilha paga:** a criação do atalho não pode morar no `.bat`. A
+versão que usava
+`for /f ... in (\`python -c "import sys;print(sys.executable)"\`)` tem
+parênteses do `print` dentro dos parênteses do `for /f`, e é aí que o `cmd`
+fecha o parêntese no lugar errado. Agora quem cria o atalho é
+`criar_atalho.py`: ele conhece `sys.executable` sem perguntar a ninguém, lê a
+área de trabalho do registro (`User Shell Folders` — quem usa OneDrive tem a
+pasta redirecionada) e grava o script do PowerShell em arquivo, o que elimina
+o problema de aspas dentro de aspas.
+
+**Terceira armadilha:** o Explorer guarda ícone em cache indexado pelo caminho
+do arquivo. Um atalho criado apontando para `.bat` (ícone de cmd) e depois
+recriado com o mesmo nome continua aparecendo como cmd. Por isso
+`criar_atalho.py` apaga o `.lnk` antigo antes de gravar e chama
+`ie4uinit.exe -show`. Quando nem isso resolve, `limpar_cache_icone.py` fecha o
+Explorer, apaga `IconCache.db` e `iconcache_*.db`, e reabre o Explorer num
+`finally` — sem o `finally` uma falha deixaria o usuário sem área de trabalho.
+
+Para depurar isso sem rodadas de tentativa e erro existe `diagnostico.py`: ele
+pergunta ao próprio Windows se consegue carregar o `.ico`
+(`LoadImageW` via `ctypes`, em 4 tamanhos), lista os atalhos nas quatro pastas
+possíveis e mostra alvo, argumentos e ícone de cada um.
 
 O `abrir.py` testa a porta abrindo uma conexão TCP de verdade, não lendo
 `netstat` — a saída do `netstat` muda com o idioma do Windows e lista também
@@ -78,6 +95,9 @@ script. Prévia em `gex_previa.png`.
 | `abrir.py` | partida: testa a porta, sobe o terminal, segura o erro na tela |
 | `GEX.bat` | duplo clique na pasta; só chama o `abrir.py` |
 | `CRIAR_ATALHO.bat` | cria o atalho da área de trabalho, com ícone |
+| `criar_atalho.py` | cria os atalhos; o `.bat` é só um chamador |
+| `diagnostico.py` | relatório de ícone, atalhos e porta, para colar no chat |
+| `limpar_cache_icone.py` | apaga o cache de ícones do Explorer |
 | `ATUALIZAR.bat` | `git pull` com mensagem em português |
 | `COPIAR_INDICADOR.bat` | manda o `.pine` para a área de transferência |
 | `fazer_icone.py` | gera `gex.ico` em Python puro |

@@ -67,6 +67,8 @@ Daí em diante é um clique no ícone da barra de tarefas.
 | `CRIAR_ATALHO.bat` | cria o atalho da área de trabalho, uma vez só |
 | `ATUALIZAR.bat` | baixa a versão mais nova do código |
 | `COPIAR_INDICADOR.bat` | copia o indicador do TradingView para a área de transferência |
+| `DIAGNOSTICO.bat` | relatório do ícone, dos atalhos e da porta, para colar no chat |
+| `LIMPAR_CACHE_ICONE.bat` | só se o atalho insistir em mostrar o ícone errado |
 
 O atalho aponta para o `python.exe` com o `abrir.py` como argumento, e **não**
 para o `GEX.bat`. O motivo é uma limitação do Windows: atalho de `.bat` é

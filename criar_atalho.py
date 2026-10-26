@@ -152,6 +152,16 @@ def main():
         print(ps)
         return 0
 
+    # Apaga o atalho antigo antes de gravar o novo. Sobrescrever por cima faz
+    # o Explorer manter o icone velho em cache com mais frequencia.
+    for d in destinos:
+        if os.path.exists(d):
+            try:
+                os.remove(d)
+                print("   removi o atalho antigo:", d)
+            except OSError as e:
+                print("   nao consegui remover", d, "-", e)
+
     arquivo = os.path.join(tempfile.gettempdir(), "gex_atalho.ps1")
     # BOM para o PowerShell 5.1 ler como UTF-8, caso o nome do usuario tenha
     # acento no caminho.
