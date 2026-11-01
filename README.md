@@ -52,12 +52,14 @@ usando o basis calculado automaticamente.
 ## Instalar em outra máquina
 
 Comece pela pasta **`instalar/`**: o arquivo `LEIA-ME-PRIMEIRO.txt` tem o
-passo a passo numerado, e o `CHECAR.bat` confere se a máquina está pronta
-antes de você tentar rodar.
+passo a passo numerado, o `INSTALAR_PYTHON.bat` instala o Python por um
+comando, e o `CHECAR.bat` confere se a máquina está pronta antes de você
+tentar rodar.
 
-Em resumo: instale o Python (marcando **"Add python.exe to PATH"**), baixe a
-pasta do projeto, rode o `CHECAR.bat` e depois o `GEX.bat`. Não há mais nada
-para instalar — nenhum `pip install`, nenhuma chave, nenhum cadastro.
+Em resumo: instale o Python (`winget install -e --id Python.Python.3.13`, ou
+pelo site marcando **"Add python.exe to PATH"**), baixe a pasta do projeto,
+rode o `CHECAR.bat` e depois o `GEX.bat`. Não há mais nada para instalar —
+nenhum `pip install`, nenhuma chave, nenhum cadastro.
 
 ## Como usar
 

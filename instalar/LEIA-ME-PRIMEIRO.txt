@@ -5,7 +5,8 @@
    Leia na ordem. Sao 5 passos e leva uns 10 minutos.
 
    O QUE VAI ACONTECER
-     1. Voce instala o Python (a unica coisa que precisa instalar)
+     1. Voce instala o Python - a unica coisa que precisa
+        instalar, e da para fazer com um comando so
      2. Baixa a pasta do projeto
      3. Roda uma checagem que diz se esta tudo certo
      4. Abre o terminal
@@ -18,6 +19,44 @@
 --------------------------------------------------------------------
    PASSO 1 - INSTALAR O PYTHON
 --------------------------------------------------------------------
+
+   Tem dois jeitos. Escolha UM.
+
+
+   JEITO RAPIDO - um comando  (recomendado)
+
+   O Windows 10 e 11 ja vem com o winget, um instalador de
+   programas por linha de comando. Ele busca o Python na fonte
+   oficial e configura o PATH sozinho - ou seja, voce nao corre
+   o risco de esquecer a caixinha do Jeito Manual.
+
+   1.1  Duplo clique em  INSTALAR_PYTHON.bat  nesta pasta
+
+        Ele confere se o Python ja existe, confere se o winget
+        existe, mostra o comando e pede sua confirmacao antes
+        de instalar qualquer coisa.
+
+   1.2  Se preferir digitar voce mesmo: abra o cmd e rode
+
+          winget install -e --id Python.Python.3.13
+
+   1.3  FECHE a janela preta e abra OUTRA.
+
+        O Windows so enxerga o Python novo em janelas abertas
+        depois da instalacao.
+
+   1.4  Na janela nova, confira:
+
+          python --version
+
+        Tem que aparecer algo como  Python 3.13.1
+
+   Se o winget nao existir nessa maquina, use o Jeito Manual
+   abaixo. (Para ter o winget: instale o "App Installer" pela
+   Microsoft Store.)
+
+
+   JEITO MANUAL - pelo site
 
    1.1  Abra no navegador:
           https://www.python.org/downloads/
@@ -192,9 +231,23 @@
 --------------------------------------------------------------------
 
    "python nao e reconhecido como comando"
-       A caixinha "Add python.exe to PATH" nao foi marcada no
-       passo 1.4. Reinstale o Python marcando ela.
+       Se voce acabou de instalar: feche a janela preta e abra
+       outra. Janelas abertas antes da instalacao nao enxergam
+       o Python novo.
+       Se ja tentou isso: a caixinha "Add python.exe to PATH"
+       nao foi marcada no Jeito Manual. Reinstale marcando ela,
+       ou use o Jeito Rapido com o winget.
        Alternativa rapida: tente  py  no lugar de  python.
+
+   O comando "python" abre a Microsoft Store
+       O Windows tem um atalho falso de python que aponta para
+       a loja. Ele atrapalha o Python de verdade.
+       Para desligar:
+         Configuracoes > Aplicativos >
+         Configuracoes avancadas de aplicativos >
+         Aliases de execucao de aplicativo
+       Desligue  python.exe  e  python3.exe
+       Depois abra uma janela nova e teste de novo.
 
    "Nao consegui abrir a porta 8777"
        Sobrou um terminal rodando de antes. Feche as janelas
