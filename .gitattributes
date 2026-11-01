@@ -3,6 +3,10 @@
 # entre parenteses.
 *.bat text eol=crlf
 
+# O LEIA-ME e aberto no Bloco de Notas. Com LF ele aparece como uma unica
+# linha gigante nas versoes antigas do Windows.
+*.txt text eol=crlf
+
 # Binarios: nada de conversao de fim de linha.
 *.ico binary
 *.png binary

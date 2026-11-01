@@ -1,0 +1,236 @@
+====================================================================
+   TERMINAL GEX - COMO INSTALAR NUMA MAQUINA NOVA
+====================================================================
+
+   Leia na ordem. Sao 5 passos e leva uns 10 minutos.
+
+   O QUE VAI ACONTECER
+     1. Voce instala o Python (a unica coisa que precisa instalar)
+     2. Baixa a pasta do projeto
+     3. Roda uma checagem que diz se esta tudo certo
+     4. Abre o terminal
+     5. Alguns opcionais
+
+   NAO precisa instalar mais nada. Nenhum "pip install", nenhum
+   programa extra, nenhuma chave de API, nenhum cadastro em site.
+
+
+--------------------------------------------------------------------
+   PASSO 1 - INSTALAR O PYTHON
+--------------------------------------------------------------------
+
+   1.1  Abra no navegador:
+          https://www.python.org/downloads/
+
+   1.2  Clique no botao grande "Download Python 3.x"
+
+   1.3  Execute o arquivo que foi baixado
+
+   1.4  ATENCAO - ESTE E O PASSO MAIS IMPORTANTE DE TODOS:
+
+          Na PRIMEIRA tela do instalador, bem embaixo, tem uma
+          caixinha escrita "Add python.exe to PATH".
+
+          MARQUE ESSA CAIXINHA.
+
+          Ela avisa o Windows onde o Python foi instalado. Sem
+          ela, nada do resto funciona - o computador vai dizer
+          que nao conhece o comando "python".
+
+   1.5  Clique em "Install Now" e espere terminar
+
+   1.6  CONFERINDO: aperte a tecla Windows, digite  cmd  e Enter.
+        Na janela preta que abrir, digite:
+
+          python --version
+
+        Tem que aparecer algo como:  Python 3.13.1
+
+        Se aparecer "python nao e reconhecido", a caixinha do
+        passo 1.4 nao foi marcada. Desinstale o Python e refaca
+        este passo.
+
+   Versao minima que funciona: 3.7
+   Versao recomendada: 3.10 ou mais nova
+
+
+--------------------------------------------------------------------
+   PASSO 2 - BAIXAR A PASTA DO PROJETO
+--------------------------------------------------------------------
+
+   Tem dois jeitos. Escolha UM dos dois.
+
+
+   JEITO A - baixar um arquivo ZIP  (mais simples)
+
+   2.1  Abra este endereco no navegador:
+
+          https://github.com/dieiser2022-rgb/indicador-gex/archive/refs/heads/terminal-completo.zip
+
+        O download comeca sozinho.
+
+   2.2  Clique com o botao direito no arquivo ZIP baixado e
+        escolha "Extrair tudo"
+
+   2.3  A pasta extraida vem com um nome comprido:
+          indicador-gex-terminal-completo
+        Renomeie para apenas:
+          indicador-gex
+
+   2.4  Mova essa pasta para dentro do C:
+        O caminho final tem que ficar assim:
+
+          C:\indicador-gex
+
+
+   JEITO B - usar o Git  (melhor para atualizar depois)
+
+   2.1  Instale o Git:
+          https://git-scm.com/download/win
+        Pode deixar todas as opcoes do instalador como vem.
+
+   2.2  Abra o cmd e digite estas duas linhas, uma por vez:
+
+          cd C:\
+          git clone -b terminal-completo https://github.com/dieiser2022-rgb/indicador-gex.git
+
+   2.3  Pronto. A pasta C:\indicador-gex foi criada.
+
+
+   QUAL ESCOLHER?
+     O Jeito B da um pouco mais de trabalho agora, mas depois
+     voce atualiza tudo com um duplo clique no ATUALIZAR.bat.
+     Com o Jeito A, atualizar significa baixar o ZIP de novo e
+     substituir a pasta na mao.
+
+
+--------------------------------------------------------------------
+   PASSO 3 - CHECAR SE ESTA TUDO CERTO
+--------------------------------------------------------------------
+
+   3.1  Abra a pasta:
+          C:\indicador-gex\instalar
+
+   3.2  Duplo clique em:
+          CHECAR.bat
+
+   3.3  Ele testa seis coisas, nesta ordem:
+
+          1. a versao do Python instalada
+          2. se a instalacao do Python esta completa
+          3. se todos os arquivos do projeto chegaram
+          4. se o codigo carrega sem erro
+          5. se a CBOE e o Yahoo respondem (as fontes de dados)
+          6. se a porta 8777 esta livre
+
+   3.4  No final ele escreve TUDO PRONTO, ou lista o que falta
+        com a palavra [FALTA] na frente.
+
+        O relatorio tambem e copiado para a area de transferencia
+        automaticamente, caso voce precise mandar para alguem.
+
+
+--------------------------------------------------------------------
+   PASSO 4 - ABRIR O TERMINAL
+--------------------------------------------------------------------
+
+   4.1  Volte uma pasta, para:
+          C:\indicador-gex
+
+   4.2  Duplo clique em:
+          GEX.bat
+
+   4.3  Vai abrir uma janela preta, e o navegador vai abrir em:
+          http://localhost:8777
+
+   4.4  No painel, clique no botao ATUALIZAR REGIOES.
+
+        A primeira carga leva de 40 a 60 segundos. E normal: o
+        arquivo de opcoes do SPX tem 13 MB.
+
+
+   MUITO IMPORTANTE SOBRE A JANELA PRETA
+
+   Ela nao e o instalador. Ela E o motor do painel.
+
+   Enquanto ela estiver aberta, o painel funciona. Pode
+   minimizar sem problema. Mas se voce fechar, o painel para de
+   responder e o navegador passa a mostrar "ligacao recusada".
+
+   E nao aperte CTRL+C dentro dela: ali esse atalho nao copia
+   nada, ele DESLIGA o servidor.
+
+
+--------------------------------------------------------------------
+   PASSO 5 - OPCIONAIS
+--------------------------------------------------------------------
+
+   5.1  ATALHO NA AREA DE TRABALHO
+        Duplo clique em CRIAR_ATALHO.bat, dentro da pasta do
+        projeto. Ele cria um atalho chamado "Terminal GEX".
+
+   5.2  AS MESMAS CORES E PREFERENCIAS DA OUTRA MAQUINA
+        Copie o arquivo  config.json  da maquina antiga para a
+        pasta C:\indicador-gex da maquina nova.
+
+        Ele guarda as cores escolhidas, a plataforma selecionada
+        e a janela de vencimento. Se voce nao copiar, o terminal
+        cria um novo com os valores padrao - nada quebra, voce
+        so perde as personalizacoes.
+
+   5.3  INDICADOR DO TRADINGVIEW
+        Nada a fazer. Ele fica salvo na sua conta do TradingView,
+        nao no computador. Ao abrir o TradingView na maquina
+        nova, ele ja esta la.
+
+        Se precisar colar de novo, duplo clique em
+        COPIAR_INDICADOR.bat e siga os passos que aparecem.
+
+
+--------------------------------------------------------------------
+   SE DER PROBLEMA
+--------------------------------------------------------------------
+
+   "python nao e reconhecido como comando"
+       A caixinha "Add python.exe to PATH" nao foi marcada no
+       passo 1.4. Reinstale o Python marcando ela.
+       Alternativa rapida: tente  py  no lugar de  python.
+
+   "Nao consegui abrir a porta 8777"
+       Sobrou um terminal rodando de antes. Feche as janelas
+       pretas abertas e tente de novo. A propria mensagem mostra
+       os comandos para achar e encerrar o processo preso.
+
+   Navegador diz "ligacao recusada" ou ERR_CONNECTION_REFUSED
+       A janela preta foi fechada. Rode o GEX.bat de novo e
+       deixe ela aberta.
+
+   A CBOE ou o Yahoo nao respondem na checagem
+       Pode ser firewall, antivirus ou rede de empresa
+       bloqueando. Teste abrindo este endereco no navegador:
+
+         https://cdn.cboe.com/api/global/delayed_quotes/options/_NDX.json
+
+       Se abrir no navegador mas nao no script, o bloqueio e do
+       antivirus ou do firewall.
+
+   Qualquer outro erro
+       Na pasta do projeto, duplo clique em DIAGNOSTICO.bat.
+       Ele monta um relatorio completo e copia para a area de
+       transferencia.
+
+
+--------------------------------------------------------------------
+   O QUE NAO PRECISA INSTALAR
+--------------------------------------------------------------------
+
+   Nenhum "pip install". Nenhuma biblioteca externa.
+   Nenhuma conta, chave de API ou cadastro em servico pago.
+
+   O projeto usa so a biblioteca padrao do Python, de proposito.
+
+   A pasta  legado/  nao e usada por nada. Era uma tentativa
+   antiga, de raspar um site de terceiros, que dependia de uma
+   biblioteca externa. Pode ignorar ela por completo.
+
+====================================================================
