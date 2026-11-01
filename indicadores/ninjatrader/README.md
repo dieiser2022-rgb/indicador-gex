@@ -35,6 +35,40 @@ A assinatura da CME dá **futuros**, não opções. A cadeia de opções continu
 vindo da CBOE, de graça e com atraso. Os dois mundos continuam existindo; o que
 muda é que o lado do futuro passa a ser confiável e em tempo real.
 
+### Quando a assinatura da CME é necessária
+
+A assinatura do usuário venceu em 01/11/2026 e ele perguntou se precisa
+renovar para construir. **Não precisa.** O NinjaTrader é gratuito para gráfico,
+backtest e simulação, sem limite de tempo; a cobrança começa no dado ao vivo
+([pricing](https://ninjatrader.com/pricing/)).
+
+Duas conexões que vêm de graça cobrem o desenvolvimento:
+
+- **Simulated Data Feed** — conexão padrão instalada com o NinjaTrader, gera
+  dado interno para simulação
+  ([doc](https://ninjatrader.com/support/helpguides/nt8/simulated_data_feed_connection.htm)).
+- **Playback / Market Replay** — reproduz dado histórico **tick a tick real**,
+  incluído sem custo adicional
+  ([doc](https://ninjatrader.com/futures/blogs/futures-paper-trading-using-historical-simulated-data/)).
+
+| Fase | Precisa de CME ao vivo? |
+|---|---|
+| 1 — linhas no gráfico | não; replay ou feed simulado basta |
+| 2 — painel no navegador | não; nem abre o NinjaTrader |
+| 3 — embrulhar no NinjaTrader | não |
+| 4 — tape e volume delta | não para desenvolver: o Market Replay traz tick real |
+
+Ou seja: a assinatura só é necessária para **usar** em operação, não para
+construir. Existe ainda um teste gratuito de 14 dias de dado ao vivo no
+simulador ([doc](https://ninjatrader.com/trading-platform/trading-simulator/)),
+útil para a validação final antes de assinar.
+
+Uma ressalva de método: os níveis vêm da CBOE referentes a **hoje**. Num replay
+de um dia passado, os níveis não correspondem àquele dia. Isso não atrapalha
+testar o **desenho** (as linhas aparecem na altura certa, o rótulo cabe, a
+grade alinha), mas a conferência de que preço e níveis conversam de verdade
+pede dado atual.
+
 ### A armadilha do basis
 
 O basis é `preço do futuro − spot do índice`, e é ele que converte os níveis do
