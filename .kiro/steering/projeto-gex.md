@@ -8,9 +8,17 @@ Terminal local de níveis de gamma para quem opera **Nasdaq (MNQ)**, mais um
 indicador próprio de TradingView em Pine Script. O estado completo está em
 `ESTADO.md` — leia antes de mexer em qualquer coisa.
 
-Repositório: `dieiser2022-rgb/indicador-gex`, branch de trabalho
-`terminal-completo` (PR #1 aberto, nunca mesclado). Pasta do usuário:
-`C:\indicador-gex`.
+Repositório: `dieiser2022-rgb/indicador-gex`. Branch de trabalho
+`terminal-completo`; o PR #1 foi mesclado em 01/11/2026 e a `main` ficou
+idêntica. Pasta do usuário: `C:\indicador-gex`.
+
+**Manter a `main` em dia.** O usuário pediu que baixar e usar fosse o mais
+simples possível, e isso depende da `main` estar atual: é ela que o botão
+"Download ZIP" do GitHub entrega. Depois de terminar uma entrega na
+`terminal-completo`, avançar a `main` com `git merge --ff-only`. Se a `main`
+ficar atrás, o usuário baixa uma versão velha sem perceber — foi exatamente o
+risco que existia antes do merge, quando ela estava 50 commits atrás e sem o
+`painel.html`.
 
 ## Regras do projeto
 

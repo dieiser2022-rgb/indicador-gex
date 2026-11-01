@@ -123,7 +123,18 @@ script. Prévia em `gex_previa.png`.
 
 ## Instalar em outra máquina
 
-A pasta `instalar/` resolve isso. O requisito único é **Python 3.7 ou mais
+O caminho curto é o **`COMECAR.bat`** na raiz: porta de entrada única que
+percorre as quatro etapas em ordem — procura o Python e oferece instalar pelo
+`winget` se faltar, roda a checagem, oferece o atalho, e sobe o terminal. Está
+em batch puro de propósito: numa máquina nova o Python pode não existir ainda,
+então a porta de entrada não pode depender dele.
+
+Um detalhe que o fluxo tem que respeitar: depois de instalar o Python, o
+script **para e pede para reabrir a janela**. O Windows monta a lista de
+programas quando o console abre, então a janela que disparou a instalação
+nunca enxerga o Python novo.
+
+A pasta `instalar/` tem o caminho detalhado. O requisito único é **Python 3.7 ou mais
 novo** (3.7 porque `ThreadingHTTPServer` e `subprocess(capture_output=)` são
 dessa versão; nada no código usa recurso mais recente). Recomendado 3.10+.
 
@@ -354,8 +365,11 @@ paciência do usuário. O caminho já pronto e não testado por ele é
    Oferecido, usuário não respondeu.
 4. **Paredes de múltiplos vencimentos** ao mesmo tempo. Oferecido, usuário não
    respondeu.
-5. **PR #1 continua aberto** na branch `terminal-completo`. Nunca foi mesclado
-   na `main` — o usuário não disse se quer.
+5. ~~PR #1 aberto~~ — **mesclado em 01/11/2026.** A `main` estava 50 commits
+   atrás e sem o `painel.html`, então quem usasse o botão "Download ZIP" do
+   GitHub baixava a primeira versão sem saber. Agora `main` e
+   `terminal-completo` apontam para o mesmo commit. **Manter assim:** ao
+   terminar uma entrega, avançar a `main` com `git merge --ff-only`.
 
 ## Nunca testado ao vivo
 
