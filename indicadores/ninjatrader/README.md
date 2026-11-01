@@ -66,13 +66,60 @@ Outras rotas úteis: `/api/estado` (teste rápido de "o terminal está no ar?") 
 `/api/gamma?simbolo=NDX` (Net GEX, regime e o perfil por strike, caso o painel
 no NinjaTrader queira mostrar isso).
 
+## O que o usuário decidiu (01/11/2026)
+
+Escopo definido por ele, em palavras dele: *"criar um terminal dentro do ninja
+do 0, usando a nossa base pronta, e ele carrega automaticamente a cada 10 min,
+ele plota automático no gráfico do ninja. Porém para o MT5 e o TradingView ele
+vai funcionar igual o nosso terminal, a gente clica no botão para gerar o
+código. Mas no NinjaTrader é tudo automático."*
+
+Traduzindo em requisitos:
+
+1. **Painel novo dentro do NinjaTrader**, desenhado do zero — não é o
+   `painel.html` embutido como está. O visual vai ser diferente, e **ele vai
+   mandar o desenho** do layout que quer.
+2. **Atualização automática a cada 10 minutos**, sem clique.
+3. **Plotagem automática no gráfico do NinjaTrader**, sem colar nada.
+4. **MT5 e TradingView continuam como são hoje**: botão no nosso terminal gera
+   a linha, o usuário cola. Nada muda nesse fluxo.
+
+Consequência: são **dois artefatos** de NinjaScript, não um. Um `Indicator`
+para desenhar no gráfico e uma janela de AddOn para o painel. Ambos leem a
+mesma rota `/api/exportar`.
+
 ## Três caminhos
 
 | | O que é | Esforço | Risco | Reescreve a interface? |
 |---|---|---|---|---|
 | **C** | Indicador que desenha os níveis no gráfico | pequeno | baixo | não tem interface |
-| **A** | Janela de AddOn com WebView2 abrindo o `painel.html` | pequeno | médio | não |
-| **B** | Painel nativo em WPF | grande | alto | sim, do zero |
+| **A** | Janela de AddOn com WebView2 abrindo uma página nossa | pequeno | médio | não, só uma página HTML nova |
+| **B** | Painel nativo em WPF | grande | alto | sim, do zero em XAML |
+
+**A decisão de "painel do zero" não implica em WPF.** Como o visual vai ser
+diferente, a opção A deixa de ser "mostrar o `painel.html`" e passa a ser
+"mostrar uma página nova, feita para o desenho dele" — por exemplo
+`painel_ninja.html`, servida pelo mesmo servidor Python numa rota nova.
+
+Comparando as duas formas de fazer o painel novo:
+
+| | WebView2 + HTML novo (A) | WPF nativo (B) |
+|---|---|---|
+| Linguagem da tela | HTML/CSS/JS, que já dominamos neste projeto | XAML e data binding, do zero |
+| Posso testar? | sim, abrindo no navegador | não, só o NinjaTrader diz |
+| C# necessário | janela fina hospedando o WebView2 | todo o painel |
+| Dependência extra | referência do WebView2 no compilador | nenhuma |
+| Gráfico e barras dentro do painel | canvas, como já fazemos | desenhar na mão em WPF |
+
+**Recomendação: A.** O ganho decisivo é poder **testar a tela no navegador**
+antes de levar para o NinjaTrader. O C# fica reduzido a uma janela fina, que é
+pouca coisa para escrever às cegas. Em WPF, cada ajuste de visual exigiria uma
+rodada de compilação no computador do usuário — e o histórico do projeto mostra
+o que isso custa (quatro rodadas no Pine, quatro no ícone da barra).
+
+O preço de A é a referência do WebView2 no compilador do NinjaTrader. Se isso
+se mostrar inviável, B continua possível, mas aí vale reduzir o escopo do
+painel.
 
 **C — indicador de gráfico.** Uma classe que herda de `Indicator`, busca o
 JSON e desenha linhas horizontais com rótulo. C# puro, nenhuma biblioteca
@@ -91,7 +138,12 @@ construído. Só vale se A se mostrar inviável.
 
 **Ordem recomendada: C primeiro, depois A.** Fazer A de cara significa que, se
 der erro, há três suspeitos ao mesmo tempo: o nosso código, a referência do
-WebView2 e o NinjaTrader. O C isola o problema no nosso código.
+WebView2 e o NinjaTrader. O C isola o problema no nosso código — e entrega
+logo o requisito 3, que é o que mexe com a operação.
+
+Dentro de A, a mesma lógica: montar e aprovar o `painel_ninja.html` **no
+navegador** primeiro, com o desenho dele na mão. Só depois embrulhar na janela
+do NinjaTrader. Assim o visual já está resolvido quando o C# entrar em cena.
 
 ## Riscos conhecidos, antes de começar
 
@@ -115,17 +167,32 @@ gráfico congela o NinjaTrader. Tem que ser assíncrono, com timeout curto, e
 falhar em silêncio quando o terminal estiver fechado — mesma filosofia do
 `fontes.py`, onde fonte fora do ar devolve vazio em vez de derrubar tudo.
 
-## Perguntas abertas para o usuário
+## Já respondido pelo usuário
 
-1. **Automático ou colado à mão?** O indicador pode buscar os níveis do
-   terminal sozinho (atualiza só, e é quase o mesmo trabalho) ou receber a
-   linha de texto colada, como no TradingView. O automático parece melhor, mas
-   confirmar.
-2. **De quanto em quanto tempo atualizar?** A CBOE tem atraso de ~15 min, então
-   buscar a cada 1 min é desperdício. Sugestão: a cada 5 min, mais um botão de
-   atualizar agora.
-3. **Mesmo repositório?** Este plano assume que sim, nesta pasta. O lado C# só
-   depende da API do terminal, então ficar junto evita versões divergentes.
+- **Automático**, sem colar nada, tanto no gráfico quanto no painel.
+- **A cada 10 minutos.** Combina com o atraso de ~15 min da CBOE.
+- **Mesmo repositório**, nesta pasta.
+- **MT5 e TradingView ficam manuais**, como já são.
+
+## Perguntas abertas
+
+1. **O desenho do layout.** Ele disse que vai mandar. Sem isso o painel não
+   começa — e é bom que seja assim: no painel web, construir a partir do
+   desenho dele numerado por área funcionou muito melhor que adivinhar.
+2. **Indicador do MT5.** Ele falou que no MT5 "funciona igual ao nosso
+   terminal, clica no botão para gerar o código". Hoje o terminal gera a linha
+   de texto para MT5, mas **o indicador de MQL5 não existe** — só o do
+   TradingView. Confirmar se ele espera esse indicador também, ou se a linha de
+   texto basta por enquanto.
+3. **O que o painel do NinjaTrader mostra.** O desenho vai dizer, mas vale
+   perguntar se ele quer tudo o que o painel web tem (agenda, notícias, morning
+   call, juros, relógio) ou só a parte de gamma. O painel web ficou com nove
+   áreas; repetir as nove dentro do NinjaTrader pode ser desnecessário, já que
+   o painel web continua existindo.
+4. **Terminal Python fechado.** A plotagem automática depende do
+   `localhost:8777` estar no ar. Decidir o comportamento: o indicador fica
+   quieto, mostra um aviso no gráfico, ou tenta subir o terminal sozinho.
+   Sugestão: aviso discreto no gráfico, sem tentar subir nada.
 
 ## Pendência relacionada
 
