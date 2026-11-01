@@ -88,6 +88,12 @@ O Python continua fazendo as contas em qualquer um dos três: o C# só leria
 `http://localhost:8777/api/exportar`. Vale lembrar que NinjaScript não pode ser
 compilado neste sandbox — mesma situação do Pine.
 
+**O plano completo está em `indicadores/ninjatrader/README.md`**: contrato da
+API medido de verdade (os 25 níveis e todos os campos da resposta), os três
+caminhos comparados, onde os arquivos moram no NinjaTrader, onde o erro de
+compilação aparece, e as três perguntas abertas. Ler esse arquivo antes de
+escrever a primeira linha de C#.
+
 ## Limitações do ambiente
 
 O sandbox **não tem rede** (`INTEGRATIONS_ONLY`) e `web_fetch` dá 403 para

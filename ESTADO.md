@@ -361,6 +361,10 @@ paciência do usuário. O caminho já pronto e não testado por ele é
    comparar com `0DTE` e `semana` e fechar a questão.
 2. **Indicadores de MT5 e NinjaTrader.** A linha de dados já é gerada para
    eles; falta escrever o indicador em MQL5 e em C#.
+
+   O NinjaTrader virou projeto próprio: o plano, o contrato da API medido de
+   verdade e os riscos estão em **`indicadores/ninjatrader/README.md`**. Leia
+   esse arquivo antes de escrever qualquer linha de C#.
 3. **Curva de juros completa** (2, 5, 10 e 30 anos, com o spread 10a−2a).
    Oferecido, usuário não respondeu.
 4. **Paredes de múltiplos vencimentos** ao mesmo tempo. Oferecido, usuário não
