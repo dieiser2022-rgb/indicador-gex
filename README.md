@@ -49,6 +49,16 @@ Para NDX, SPX, QQQ e SPY:
 Para NQ e ES, os mesmos níveis convertidos do índice para o preço do futuro,
 usando o basis calculado automaticamente.
 
+## Instalar em outra máquina
+
+Comece pela pasta **`instalar/`**: o arquivo `LEIA-ME-PRIMEIRO.txt` tem o
+passo a passo numerado, e o `CHECAR.bat` confere se a máquina está pronta
+antes de você tentar rodar.
+
+Em resumo: instale o Python (marcando **"Add python.exe to PATH"**), baixe a
+pasta do projeto, rode o `CHECAR.bat` e depois o `GEX.bat`. Não há mais nada
+para instalar — nenhum `pip install`, nenhuma chave, nenhum cadastro.
+
 ## Como usar
 
 ### Windows, com um clique

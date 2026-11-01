@@ -101,6 +101,8 @@ script. Prévia em `gex_previa.png`.
 | `ATUALIZAR.bat` | `git pull` com mensagem em português |
 | `COPIAR_INDICADOR.bat` | manda o `.pine` para a área de transferência |
 | `fazer_icone.py` | gera `gex.ico` em Python puro |
+| `instalar/LEIA-ME-PRIMEIRO.txt` | passo a passo para máquina nova |
+| `instalar/checar_instalacao.py` | confere Python, arquivos, fontes e porta |
 | `config.json` | cores e preferências (criado no primeiro uso, fora do git) |
 | `legado/` | primeiras tentativas raspando site de terceiros (abandonado) |
 
@@ -118,6 +120,31 @@ script. Prévia em `gex_previa.png`.
 | `/api/exportar?ativo=&plataforma=&simbolo=&dias=` | a linha para colar no indicador |
 | `/api/config` | GET e POST das preferências |
 | `/api/estado` | diagnóstico: o que respondeu e o que falhou |
+
+## Instalar em outra máquina
+
+A pasta `instalar/` resolve isso. O requisito único é **Python 3.7 ou mais
+novo** (3.7 porque `ThreadingHTTPServer` e `subprocess(capture_output=)` são
+dessa versão; nada no código usa recurso mais recente). Recomendado 3.10+.
+
+O `checar_instalacao.py` roda seis checagens em ordem — versão do Python,
+módulos da biblioteca padrão, arquivos presentes, o código carregando, CBOE e
+Yahoo respondendo, porta 8777 livre — e no fim diz `TUDO PRONTO` ou lista o
+que falta com `[FALTA]`. Ele lê a pasta do projeto como o diretório **acima**
+do próprio arquivo, então funciona sem configuração.
+
+Validado clonando o repositório numa pasta limpa: os 11 arquivos obrigatórios
+chegam, os 5 módulos próprios carregam, e o `abrir.py` sobe o servidor e serve
+o painel de 74 KB.
+
+Dois pontos que o `LEIA-ME` destaca porque são as armadilhas reais: a caixinha
+**"Add python.exe to PATH"** no instalador do Python (sem ela nada funciona) e
+que a **janela preta é o motor**, não o instalador. O `config.json` fica fora
+do git, então as cores e preferências não viajam — quem quiser as mesmas copia
+o arquivo na mão.
+
+A pasta `legado/` é a única que depende de biblioteca externa (playwright) e
+não é usada por nada.
 
 ## Fontes de dados
 
