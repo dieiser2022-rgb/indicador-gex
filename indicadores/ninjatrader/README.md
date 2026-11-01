@@ -148,21 +148,49 @@ só por `strike`, e aplicar a mesma fórmula de GEX em dólares que o
 vencimentos, 210 células. Falta apenas uma rota que devolva a matriz e o
 desenho na tela.
 
-### A pergunta que define o trabalho: o que são as colunas?
+### Colunas = datas de vencimento (resolvido)
 
-| Colunas | O que mostra | Precisa de histórico? |
-|---|---|---|
-| **Vencimento** | como o gamma se distribui entre 0DTE, 1d, 2d, 7d... | não — pronto hoje |
-| **Hora do dia** | como o GEX de cada strike mudou ao longo da sessão | **sim** |
+Um print da tela de referência, mandado em 01/11/2026, resolveu a dúvida: o
+cabeçalho da grade diz **"GAMMA PROFILE | POR VENCIMENTO"**, e as colunas
+trazem datas (`09/10`, `10/10`, `13/10`...).
 
-No esboço dele a linha de preço atravessa a grade da esquerda para a direita, o
-que sugere **hora do dia**. Isso traz a mesma dependência da área 6: o terminal
-precisa coletar desde a abertura, senão as colunas da manhã ficam vazias.
+Consequência boa: **não precisa de histórico intraday.** A grade sai do dado
+que já baixamos, numa única leitura. A linha branca de preço desenhada sobre a
+grade é enfeite de referência visual, não um eixo de tempo.
 
-Vale notar por que a versão por hora tem conteúdo real: o open interest é fixo
-durante o dia, mas o GEX em dólares depende do spot (`gamma × OI × 100 ×
-spot² × 0,01`) e da distância do strike ao preço. Conforme o preço anda, o mapa
-de calor muda de verdade — não é redundante.
+Protótipo de 01/11/2026 produziu 23 strikes × 8 datas de vencimento, mais as
+duas colunas de barras (call e put), todas compartilhando as mesmas linhas.
+
+Uma mudança pequena é necessária: `analisar()` em `gamma_cboe.py` guarda só
+`dias`, não a data do vencimento. Para as colunas serem datas, o `venc` tem que
+entrar no dicionário de cada contrato usável.
+
+### São três partes alinhadas, não duas
+
+O print mostra, da esquerda para a direita, **três** painéis dividindo o mesmo
+eixo vertical:
+
+1. **gráfico de candles** com os níveis rotulados
+2. **grade de GEX** por strike × vencimento
+3. **barras horizontais** de call e put por strike
+
+O usuário marcou isso com uma linha magenta atravessando a tela inteira: um
+nível em 7.011 fica na mesma altura nos três. Os dados das barras também já
+existem (`call_gex`, `put_gex` e o open interest por strike).
+
+### Nomenclatura dos níveis (resolvido)
+
+Os rótulos no gráfico de referência são `(ES) GEX 7`, `(ES) GEX 8`,
+`(ES) GEX 9`, `(ES) Call Wall 0DTE`, `(ES) HVL 0DTE`, `(ES) HVL`,
+`(ES) Put Wall 0DTE`, `(ES) Put Wall` — ou seja, **a mesma nomenclatura que já
+usamos**, com o prefixo do ativo entre parênteses.
+
+Isso dispensa inventar as faixas `GEX EXTREMO / ALTO / MÉDIO / NEUTRO / BAIXO`
+que apareceram no primeiro esboço: aquilo era estilização dele, não o padrão da
+referência. Confirmar antes de descartar de vez.
+
+Observação: a tela de referência é de **ES/SPX**. O usuário opera MNQ, então o
+prefixo no nosso caso é `(NQ)` ou `(MNQ)`.
 
 ### O conflito de escala vertical
 
@@ -170,10 +198,16 @@ O gráfico de preço cobre a faixa do dia, algo como 1% a 2%. Os strikes que
 calculamos cobrem ±12% (`FAIXA` no `gamma_cboe.py`). Dividir o mesmo eixo entre
 os dois obriga a escolher:
 
-1. **Mostrar só os strikes que cabem na janela do gráfico** — recomendado. É o
-   que o esboço parece mostrar, e mantém as duas partes legíveis.
-2. Mostrar todos os strikes e comprimir o gráfico numa faixa fina — o preço
-   viraria uma linha quase reta, perdendo utilidade.
+1. **Mostrar só os strikes que cabem na janela do gráfico** — as duas partes
+   ficam legíveis, mas poucos strikes aparecem.
+2. **Abrir o gráfico para cobrir a faixa dos strikes** — é o que a tela de
+   referência faz: o eixo vai de ~6250 a ~6750 e os candles ficam pequenos,
+   porque ali o gráfico serve de régua para os níveis, não para leitura de
+   candle.
+
+A referência escolheu a 2. Confirmar com o usuário, porque isso define se o
+gráfico do painel é para operar ou só para localizar os níveis — ele já tem o
+gráfico do NinjaTrader para operar.
 
 O alinhamento em si é a parte fácil: o painel já desenha candles e níveis em
 canvas com uma função própria de preço para pixel. Usar a mesma função nas duas
