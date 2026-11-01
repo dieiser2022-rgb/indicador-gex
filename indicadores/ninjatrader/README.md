@@ -18,6 +18,54 @@ divergiriam na primeira correção.
 NinjaTrader é C# com WPF. Não existe conversão automática. Essa é a única
 parte que precisa nascer de novo — e o caminho A abaixo contorna até isso.
 
+## As duas fontes de dados, e a armadilha entre elas
+
+O painel desenhado pelo usuário mistura dois mundos, e eles têm atrasos
+diferentes. Confundir isso produz níveis errados.
+
+| | Opções / gamma | Futuro em tempo real |
+|---|---|---|
+| Fonte | CBOE, `delayed_quotes` | CME, dentro do NinjaTrader |
+| Custo | grátis | assinatura do usuário, ~US$ 4/mês |
+| Atraso | ~15 minutos | tempo real |
+| Entrega | nosso Python, `/api/exportar` | só o NinjaTrader tem |
+| Alimenta | heatmap, paredes, HVL, key levels, GEX líquido | tape, volume delta, preço do gráfico, status de conexão |
+
+A assinatura da CME dá **futuros**, não opções. A cadeia de opções continua
+vindo da CBOE, de graça e com atraso. Os dois mundos continuam existindo; o que
+muda é que o lado do futuro passa a ser confiável e em tempo real.
+
+### A armadilha do basis
+
+O basis é `preço do futuro − spot do índice`, e é ele que converte os níveis do
+NDX para a escala do MNQ. Hoje os dois lados vêm **atrasados em ~15 min**
+(Yahoo para o `NQ=F`, CBOE para o NDX), então formam um par coerente.
+
+Com a assinatura da CME, surge a tentação de usar o preço do NQ em tempo real
+para calcular o basis. **Não fazer isso.** Um futuro ao vivo menos um índice de
+15 minutos atrás não é o basis: é o basis mais o movimento do índice nesses 15
+minutos. No Nasdaq isso desloca todos os níveis de uma vez, em dezenas de
+pontos, e o erro é silencioso.
+
+Regra: **basis sempre com os dois lados do mesmo instante.** O preço ao vivo da
+CME serve para o gráfico e para o tape, não para converter níveis.
+
+### Como o tape chega no painel
+
+Se o painel for HTML dentro de um WebView2 (caminho A), a página não tem acesso
+aos ticks do NinjaTrader. Quem tem é o C#. A ligação se faz com
+`PostWebMessageAsJson` do WebView2: o AddOn empurra o tape e o volume delta
+para dentro da página, e o JavaScript escuta.
+
+Isso preserva a vantagem de poder testar a página no navegador: sem o
+hospedeiro C#, ela simplesmente mostra a área de tape como indisponível, do
+mesmo jeito que o `fontes.py` devolve vazio quando uma fonte está fora do ar.
+
+Nota sobre a licença: dado de CME é licenciado para exibição ao assinante. Usar
+dentro da máquina dele — NinjaTrader, e uma página local que o próprio
+NinjaTrader hospeda — é uso normal. O que não se faz é o servidor Python
+reemitir esse dado para fora da máquina.
+
 ## O contrato de dados
 
 O NinjaTrader roda na mesma máquina que o terminal, então basta um GET em:
@@ -193,6 +241,15 @@ falhar em silêncio quando o terminal estiver fechado — mesma filosofia do
    `localhost:8777` estar no ar. Decidir o comportamento: o indicador fica
    quieto, mostra um aviso no gráfico, ou tenta subir o terminal sozinho.
    Sugestão: aviso discreto no gráfico, sem tentar subir nada.
+5. **Como classificar os níveis do desenho.** O esboço traz `GEX EXTREMO`,
+   `ALTO`, `MÉDIO`, `NEUTRO` e `BAIXO`, que não existem no projeto — hoje são
+   Call Wall, Put Wall, HVL e key levels. Parecem faixas de intensidade.
+   Falta o usuário dizer o critério: tamanho do GEX, distância do preço, ou
+   outro conceito.
+6. **Histórico intraday.** As áreas de GEX por hora e acumulado exigem guardar
+   medições ao longo do dia, o que implica deixar o terminal ligado desde a
+   abertura. O `agendador.py` é a peça inicial. Confirmar se ele aceita esse
+   custo.
 
 ## Pendência relacionada
 
