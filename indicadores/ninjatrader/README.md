@@ -305,6 +305,56 @@ Dentro de A, a mesma lógica: montar e aprovar o `painel_ninja.html` **no
 navegador** primeiro, com o desenho dele na mão. Só depois embrulhar na janela
 do NinjaTrader. Assim o visual já está resolvido quando o C# entrar em cena.
 
+## Roteiro de execução
+
+Combinado em 01/11/2026. A ordem foi escolhida para que o maior risco — código
+C# escrito sem poder compilar — seja testado com o menor pedaço possível, e não
+no fim, dentro de um painel inteiro.
+
+### Etapa 0 — destravar (do usuário)
+
+1. Rodar `VER_CAMPOS_CBOE.bat` e mandar o relatório. Define se as colunas
+   `VOLUME` e `DELTA %` da grade são viáveis. Bloqueia só essas duas colunas,
+   não o resto.
+2. Abrir sessão nova no Kiro com o repositório `indicador-gex`, para sair da
+   conversa longa. Este arquivo e o `ESTADO.md` viajam no clone.
+
+### Etapa 1 — indicador mínimo (prova de fogo)
+
+Um `Indicator` em C# que desenha **apenas duas linhas**: Call Wall e Put Wall,
+lidas de `/api/exportar`. Umas poucas dezenas de linhas de código.
+
+O objetivo não é o resultado, é provar o ciclo inteiro de uma vez: a pasta
+certa, o C# alcançando `localhost:8777`, o JSON sendo lido, a linha desenhada
+na altura certa, e a busca assíncrona sem travar a interface. Se algo estiver
+errado, o erro aparece com um suspeito só.
+
+### Etapa 2 — indicador completo
+
+Todos os níveis, rótulos com prefixo `(NQ)`, cores e estilos configuráveis por
+grupo, atualização automática a cada 15 min, e aviso discreto quando o terminal
+Python estiver fechado.
+
+### Etapa 3 — painel no navegador, igual ao print
+
+As três partes dividindo o eixo vertical: gráfico-régua, grade por vencimento,
+barras de call e put. Feito como página servida pelo nosso Python, aprovada no
+navegador antes de qualquer C#.
+
+Precisa de duas mudanças no lado Python:
+- `analisar()` passar a guardar `venc`, não só `dias`
+- rota nova devolvendo a matriz `strike × vencimento` mais as barras por strike
+
+### Etapa 4 — painel dentro do NinjaTrader
+
+AddOn com `NTWindow` + WebView2 abrindo a página da etapa 3. Item no menu
+"Novo", como o painel de terceiros que ele usa de referência.
+
+### Etapa 5 — tape e volume delta
+
+O C# empurra os ticks para dentro da página via `PostWebMessageAsJson`.
+Desenvolvível com Market Replay, sem assinatura.
+
 ## Riscos conhecidos, antes de começar
 
 **NinjaScript não compila no sandbox do agente.** Mesma situação do Pine
