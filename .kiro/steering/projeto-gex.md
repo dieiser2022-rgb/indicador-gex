@@ -46,7 +46,14 @@ Quatro erros já custaram tempo. Não repetir:
    validadas; para tirar espaço usar `str.replace_all(s, " ", "")`.
 
 Sempre que o Pine mudar, subir o número em `VERSAO` — o aviso no gráfico
-(`GEX v4: ...`) é o único jeito do usuário conferir se colou o código atual.
+(`GEX v5: ...`, versão atual) é o único jeito do usuário conferir se colou o
+código atual. O `copiar_indicador.py` lê esse número do próprio `.pine`, então
+não precisa ser atualizado em dois lugares.
+
+Antes de entregar Pine novo, vale rodar a verificação das quatro armadilhas e
+simular o parser do Pine em Python contra a linha exportada — foi assim que os
+key levels 0DTE foram validados sem compilar nada. O parser normaliza o nome
+para maiúsculas e sem espaço, então `GEX 1 0DTE` vira a chave `GEX10DTE`.
 
 **Pegadinha:** o TradingView guarda as configurações salvas de cada instância.
 Mudar o valor padrão de um `input` **não** muda o gráfico que o usuário já tem.
@@ -69,6 +76,18 @@ quatro tentativas foram às cegas e gastaram a paciência dele. A pergunta de
 múltipla escolha está aguardando resposta, e o `ARRUMAR_ICONE.bat` já está
 pronto e ainda não foi testado por ele.
 
+## Assunto em discussão: NinjaTrader
+
+O usuário viu um painel de terceiros rodando dentro do NinjaTrader e perguntou
+se dá para fazer o nosso lá. Foram apresentados três caminhos e ele ainda não
+escolheu: **(C)** só o indicador que desenha os níveis no gráfico, em C# puro —
+o recomendado, menor risco; **(A)** janela de AddOn com WebView2 mostrando o
+`painel.html` que já existe; **(B)** reescrever o painel em WPF, que é grande.
+
+O Python continua fazendo as contas em qualquer um dos três: o C# só leria
+`http://localhost:8777/api/exportar`. Vale lembrar que NinjaScript não pode ser
+compilado neste sandbox — mesma situação do Pine.
+
 ## Limitações do ambiente
 
 O sandbox **não tem rede** (`INTEGRATIONS_ONLY`) e `web_fetch` dá 403 para
@@ -83,12 +102,23 @@ didática**: analogia do dia a dia antes do termo técnico, passo a passo, texto
 curto e conversacional, resumo de uma ou duas frases no fim.
 
 **Ele não tem acesso ao sandbox.** Todo código chega até ele por `git pull`, e
-ele não vê saída de terminal — então mostrar no chat o que importa. Os comandos
-que ele usa:
+ele não vê saída de terminal — então mostrar no chat o que importa.
+
+Os comandos que ele usa:
 
 ```
 cd C:\indicador-gex
 git pull origin terminal-completo
 python terminal.py
-type indicadores\tradingview_gex.pine | clip
 ```
+
+Para não depender de ele copiar texto da janela preta, os scripts de relatório
+usam `relatorio.capturar()`, que joga a saída na área de transferência. Vale
+reaproveitar em qualquer script novo cuja saída ele precise mandar no chat.
+
+Atalhos prontos na raiz do repositório, todos chamadores finos de um `.py` de
+mesmo nome: `COMECAR.bat` (porta de entrada única), `GEX.bat`, `ATUALIZAR.bat`,
+`COPIAR_INDICADOR.bat`, `VER_VENCIMENTOS.bat`, `DIAGNOSTICO.bat`,
+`CRIAR_ATALHO.bat`, `ARRUMAR_ICONE.bat`, `LIMPAR_CACHE_ICONE.bat`. Os `.bat`
+precisam de CRLF (garantido pelo `.gitattributes`) e devem ficar finos: lógica
+em `.bat` já quebrou duas vezes por causa do parser do `cmd`.
