@@ -136,6 +136,50 @@ Consequência: são **dois artefatos** de NinjaScript, não um. Um `Indicator`
 para desenhar no gráfico e uma janela de AddOn para o painel. Ambos leem a
 mesma rota `/api/exportar`.
 
+## O heatmap de GEX, alinhado ao gráfico
+
+O usuário pediu uma grade de GEX **parelha com o gráfico**: cada linha é um
+strike, e a linha do strike 18.600 tem que ficar na mesma altura que 18.600 no
+gráfico de preço, com a linha de preço por cima.
+
+**Os dados já existem.** Basta agrupar `usaveis` por `(dias, strike)` em vez de
+só por `strike`, e aplicar a mesma fórmula de GEX em dólares que o
+`gex_por_strike` usa. Protótipo rodado em 01/11/2026 produziu 21 strikes × 10
+vencimentos, 210 células. Falta apenas uma rota que devolva a matriz e o
+desenho na tela.
+
+### A pergunta que define o trabalho: o que são as colunas?
+
+| Colunas | O que mostra | Precisa de histórico? |
+|---|---|---|
+| **Vencimento** | como o gamma se distribui entre 0DTE, 1d, 2d, 7d... | não — pronto hoje |
+| **Hora do dia** | como o GEX de cada strike mudou ao longo da sessão | **sim** |
+
+No esboço dele a linha de preço atravessa a grade da esquerda para a direita, o
+que sugere **hora do dia**. Isso traz a mesma dependência da área 6: o terminal
+precisa coletar desde a abertura, senão as colunas da manhã ficam vazias.
+
+Vale notar por que a versão por hora tem conteúdo real: o open interest é fixo
+durante o dia, mas o GEX em dólares depende do spot (`gamma × OI × 100 ×
+spot² × 0,01`) e da distância do strike ao preço. Conforme o preço anda, o mapa
+de calor muda de verdade — não é redundante.
+
+### O conflito de escala vertical
+
+O gráfico de preço cobre a faixa do dia, algo como 1% a 2%. Os strikes que
+calculamos cobrem ±12% (`FAIXA` no `gamma_cboe.py`). Dividir o mesmo eixo entre
+os dois obriga a escolher:
+
+1. **Mostrar só os strikes que cabem na janela do gráfico** — recomendado. É o
+   que o esboço parece mostrar, e mantém as duas partes legíveis.
+2. Mostrar todos os strikes e comprimir o gráfico numa faixa fina — o preço
+   viraria uma linha quase reta, perdendo utilidade.
+
+O alinhamento em si é a parte fácil: o painel já desenha candles e níveis em
+canvas com uma função própria de preço para pixel. Usar a mesma função nas duas
+metades resolve, desde que a conversão do basis seja aplicada antes (os strikes
+estão na escala do índice, o gráfico na do futuro).
+
 ## Três caminhos
 
 | | O que é | Esforço | Risco | Reescreve a interface? |
@@ -218,7 +262,8 @@ falhar em silêncio quando o terminal estiver fechado — mesma filosofia do
 ## Já respondido pelo usuário
 
 - **Automático**, sem colar nada, tanto no gráfico quanto no painel.
-- **A cada 10 minutos.** Combina com o atraso de ~15 min da CBOE.
+- **A cada 15 minutos**, decidido em 01/11/2026. Casa com o ritmo de publicação
+  da CBOE: buscar mais vezes traria o mesmo dado.
 - **Mesmo repositório**, nesta pasta.
 - **MT5 e TradingView ficam manuais**, como já são.
 
