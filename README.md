@@ -1,5 +1,21 @@
 # indicador-gex
 
+## Começar em 3 passos
+
+1. [**Baixar o projeto**](https://github.com/dieiser2022-rgb/indicador-gex/archive/refs/heads/main.zip) — clique, extraia o ZIP
+2. Entre na pasta e dê duplo clique em **`COMECAR.bat`**
+3. Pronto
+
+O `COMECAR.bat` faz o resto em ordem: instala o Python se não tiver, confere a
+máquina, oferece um atalho na área de trabalho e abre o terminal. Ele pede
+confirmação antes de instalar qualquer coisa.
+
+Nada mais precisa ser instalado — nenhum `pip install`, nenhuma chave de API,
+nenhum cadastro. O passo a passo detalhado, com os problemas comuns, está em
+[`instalar/LEIA-ME-PRIMEIRO.txt`](instalar/LEIA-ME-PRIMEIRO.txt).
+
+---
+
 Terminal local de níveis de gamma (GEX) para índices e futuros americanos.
 Calcula os níveis a partir da cadeia de opções da CBOE, sem depender de nenhum
 site de terceiros e sem precisar de login, cadastro ou chave de API.

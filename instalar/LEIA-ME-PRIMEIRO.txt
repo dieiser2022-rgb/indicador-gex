@@ -2,6 +2,22 @@
    TERMINAL GEX - COMO INSTALAR NUMA MAQUINA NOVA
 ====================================================================
 
+   O JEITO MAIS CURTO
+
+   Se voce ja tem a pasta do projeto no computador, nao precisa
+   ler nada disto. Va na pasta de cima e de duplo clique em:
+
+       COMECAR.bat
+
+   Ele faz tudo em ordem: instala o Python se nao tiver, confere
+   a maquina, oferece o atalho e abre o terminal. Pede sua
+   confirmacao antes de instalar qualquer coisa.
+
+   Este arquivo aqui e para quando algo nao funcionar, ou para
+   quem prefere fazer cada passo na mao.
+
+   ------------------------------------------------------------
+
    Leia na ordem. Sao 5 passos e leva uns 10 minutos.
 
    O QUE VAI ACONTECER
