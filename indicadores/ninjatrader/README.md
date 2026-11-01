@@ -100,6 +100,76 @@ dentro da máquina dele — NinjaTrader, e uma página local que o próprio
 NinjaTrader hospeda — é uso normal. O que não se faz é o servidor Python
 reemitir esse dado para fora da máquina.
 
+## O que a CBOE entrega de verdade (medido em 01/11/2026)
+
+Relatório do `ver_campos_cboe.py` na máquina do usuário, NDX, 14.640 contratos
+no arquivo (amostra de 4.000):
+
+| Campo | Preenchidos | Viável para a grade? |
+|---|---|---|
+| `option`, `gamma`, `open_interest`, `iv` | — | já usamos |
+| `delta` | 3996 / 4000 (99,9%) | **sim**, cobertura quase total |
+| `volume` | 909 / 4000 (23%) | **sim**, mas esparso por natureza |
+| `theta` | 3867 / 4000 | disponível |
+| `vega` | 4000 / 4000 | disponível |
+| `rho` | 3995 / 4000 | disponível |
+| `theo` (preço teórico) | 4000 / 4000 | disponível |
+| `bid`, `ask`, `bid_size`, `ask_size` | ~4000 | disponível |
+| `last_trade_price`, `last_trade_time` | 2823 / 4000 | disponível |
+| `prev_day_close` | 3990 / 4000 | disponível |
+| `open`, `high`, `low`, `change`, `percent_change` | ~909 | só quem negociou |
+
+Dois números merecem atenção:
+
+- **`volume` só em 23%** não é defeito: a maioria dos contratos não negocia no
+  dia. Agregado por strike, os strikes perto do dinheiro terão volume e os
+  distantes aparecerão vazios. A coluna funciona, mas vai ter muitos brancos —
+  vale combinar isso com o usuário antes de ele achar que quebrou.
+- **`gamma` só em 52%** (2094 de 4000). Ou seja, em quase metade dos contratos
+  o gamma é calculado pelo nosso Black-Scholes. O caminho de contingência não é
+  exceção, é metade do trabalho — mexer nele afeta muita coisa.
+
+### O nível `data` tem muito mais do que usamos
+
+Hoje lemos apenas `current_price` e `options`. O arquivo também traz:
+
+```
+ask, ask_size, bid, bid_size, close, current_price, exchange_id, high,
+iv30, iv30_change, iv30_change_percent, last_trade_time, low, open,
+prev_day_close, price_change, price_change_percent, security_type,
+seqno, symbol, tick, volume
+```
+
+Duas oportunidades concretas:
+
+- **`iv30`** é a volatilidade implícita de 30 dias do índice, publicada pela
+  própria CBOE. Hoje o `1D Min/Max` usa a **mediana das IVs dos contratos**,
+  que é uma aproximação nossa. Trocar por `iv30` seria mais correto na teoria —
+  mas **mudaria os números já validados** contra a referência, então não trocar
+  sem comparar os dois lado a lado primeiro.
+- **`prev_day_close` e `price_change_percent`** dariam a variação do dia do
+  índice sem depender do Yahoo, reduzindo uma dependência externa.
+
+### Cuidado com valores absurdos
+
+No relatório o exemplo de `iv` veio **3,2384** (323%) e o de `delta` veio
+**1,0**: são contratos muito dentro do dinheiro, onde a IV publicada perde
+sentido. O filtro `0 < iv < 3` em `gamma_cboe.py` existe por isso e está
+fazendo trabalho real — qualquer coluna nova que use `iv` ou `delta` precisa
+de guarda equivalente.
+
+### Falta definir: o que é a coluna `DELTA %`
+
+O dado existe, a conta não está decidida. No primeiro esboço os valores iam de
+−1,25% no strike mais alto, subiam até cerca de +1,88% um pouco abaixo do spot,
+e voltavam a cair — o desenho de uma distribuição com pico, não de uma
+distância ao preço.
+
+Proposta: **exposição de delta por strike**,
+`Σ(delta × open_interest × 100 × spot)`, com sinal invertido para puts, exibida
+como percentual do total do dia. Lê-se como "quanto do delta do mercado está
+ancorado neste strike". Confirmar com o usuário antes de implementar.
+
 ## O contrato de dados
 
 O NinjaTrader roda na mesma máquina que o terminal, então basta um GET em:
